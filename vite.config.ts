@@ -7,11 +7,11 @@ import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-export default defineConfig(() => {
+export default defineConfig(({ command }) => {
   return {
     plugins: [react(), tailwindcss()],
-    // Tambahkan baris base di bawah ini agar GitHub Pages membaca path file dengan benar
-    base: '/LF_App-enterprise/',
+    // Gunakan './' saat build agar path aset otomatis menyesuaikan di GitHub Pages (baik root maupun /LF_App-enterprise/)
+    base: command === 'build' ? './' : '/',
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),
