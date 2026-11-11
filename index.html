@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Latisha Farma - Apotek & Praktek Dokter Terpadu</title>
+    <meta name="description" content="Sistem Manajemen Komprehensif Apotek & Praktek Dokter Latisha Farma: Rekam Medis Elektronik (RME SOAP & ICD-10), Kasir POS Farmasi Multi-Tier, Manajemen Stok Obat FEFO, Pendaftaran Pasien Online, Laporan Keuangan Otomatis, Sinkronisasi Multi-Cabang, Mobile Staf Medis, dan Live Monitor Antrean dengan Pemanggil Suara." />
+    <meta property="og:title" content="Latisha Farma - Apotek & Praktek Dokter Terpadu" />
+    <meta property="og:description" content="Sistem Manajemen Komprehensif Apotek & Praktek Dokter Latisha Farma: Rekam Medis Elektronik (RME SOAP & ICD-10), Kasir POS Farmasi Multi-Tier, Manajemen Stok Obat FEFO, Pendaftaran Pasien Online, Laporan Keuangan Otomatis, Sinkronisasi Multi-Cabang, Mobile Staf Medis, dan Live Monitor Antrean dengan Pemanggil Suara." />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script>
+      // Sandboxed iframe safe guard to prevent "Ignored call to 'confirm()' / 'alert()'"
+      window.confirm = function(msg) {
+        console.info('[Iframe Guard] confirm() called:', msg);
+        return true;
+      };
+      window.alert = function(msg) {
+        console.info('[Iframe Guard] alert() called:', msg);
+      };
+
+      // Guard against unreachable Vite HMR WebSocket port 24678 in cloud sandbox environment
+      (function() {
+        const NativeWebSocket = window.WebSocket;
+        if (!NativeWebSocket) return;
+
+        function MockHmrWebSocket(url, protocols) {
+          const target = new EventTarget();
+          target.CONNECTING = 0;
+          target.OPEN = 1;
+          target.CLOSING = 2;
+          target.CLOSED = 3;
+          target.readyState = 0;
+          target.url = String(url);
+          target.protocol = Array.isArray(protocols) ? protocols[0] || '' : (protocols || '');
+          target.bufferedAmount = 0;
+          target.extensions = '';
+          target.binaryType = 'blob';
+
+          target.send = function() {};
+          target.close = function(code, reason) {
+            target.readyState = 3;
+            const ev = new Event('close');
+            Object.assign(ev, { code: code || 1000, reason: reason || '', wasClean: true });
+            target.dispatchEvent(ev);
+            if (typeof target.onclose === 'function') target.onclose(ev);
+          };
+
+          // Simulate immediate successful open so Vite client never times out or throws unhandled rejection
+          setTimeout(function() {
+            target.readyState = 1;
+            const openEv = new Event('open');
+            target.dispatchEvent(openEv);
+            if (typeof target.onopen === 'function') target.onopen(openEv);
+          }, 0);
+
+          return target;
+        }
+
+        MockHmrWebSocket.CONNECTING = 0;
+        MockHmrWebSocket.OPEN = 1;
+        MockHmrWebSocket.CLOSING = 2;
+        MockHmrWebSocket.CLOSED = 3;
+        MockHmrWebSocket.prototype = NativeWebSocket.prototype;
+
+        window.WebSocket = function(url, protocols) {
+          const urlStr = String(url || '');
+          const protoStr = Array.isArray(protocols) ? protocols.join(' ') : String(protocols || '');
+          if (urlStr.includes(':24678') || protoStr.includes('vite-hmr') || protoStr.includes('vite-ping')) {
+            return new MockHmrWebSocket(url, protocols);
+          }
+          return new NativeWebSocket(url, protocols);
+        };
+
+        window.WebSocket.CONNECTING = 0;
+        window.WebSocket.OPEN = 1;
+        window.WebSocket.CLOSING = 2;
+        window.WebSocket.CLOSED = 3;
+        window.WebSocket.prototype = NativeWebSocket.prototype;
+
+        // Catch and suppress any residual WebSocket unhandled rejections
+        window.addEventListener('unhandledrejection', function(event) {
+          if (event && event.reason) {
+            const msg = String(event.reason.message || event.reason);
+            if (msg.includes('WebSocket') || msg.includes('vite')) {
+              event.preventDefault();
+            }
+          }
+        });
+      })();
+    </script>
+  </head>
+  <body class="bg-slate-100 text-slate-800 antialiased font-sans">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

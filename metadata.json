@@ -1,0 +1,6 @@
+{
+  "name": "Latisha Farma - Apotek & Praktek Dokter",
+  "description": "Sistem Manajemen Apotek & Praktek Dokter Latisha Farma: Rekam Medis Elektronik (RME SOAP & ICD-10), Kasir POS Farmasi Multi-Tier, Manajemen Stok Obat FEFO, Pendaftaran Pasien Online, Laporan Keuangan Otomatis, Sinkronisasi Multi-Cabang, Mobile Staf Medis, dan Live Monitor Antrean dengan Pemanggil Suara.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

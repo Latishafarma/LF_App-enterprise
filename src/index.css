@@ -1,0 +1,120 @@
+@import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
+body {
+  font-family: var(--font-sans);
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 12mm 15mm;
+  }
+
+  html, body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    overflow: visible !important;
+    height: auto !important;
+    min-height: auto !important;
+    font-size: 11pt !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Reset all scrolling and overflow wrappers so content is never clipped */
+  #root,
+  main,
+  div {
+    overflow: visible !important;
+    height: auto !important;
+    max-height: none !important;
+    box-shadow: none !important;
+  }
+
+  /* Hide app navigation and headers */
+  .no-print,
+  header,
+  aside,
+  nav {
+    display: none !important;
+    visibility: hidden !important;
+  }
+
+  /* Ensure printable area and its children are 100% visible and formatted for paper */
+  #printable-section {
+    display: block !important;
+    visibility: visible !important;
+    position: static !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+
+  #printable-section * {
+    visibility: visible !important;
+    color: #000000 !important;
+  }
+
+  #printable-section img {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  #printable-section table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    page-break-inside: auto !important;
+    margin-top: 8px !important;
+  }
+
+  #printable-section th,
+  #printable-section td {
+    border: 1px solid #1e293b !important;
+    padding: 5px 8px !important;
+    color: #000000 !important;
+    font-size: 9.5pt !important;
+  }
+
+  #printable-section thead {
+    display: table-header-group !important;
+    background: #f1f5f9 !important;
+  }
+
+  #printable-section thead th {
+    background: #e2e8f0 !important;
+    font-weight: bold !important;
+  }
+
+  #printable-section tr {
+    page-break-inside: avoid !important;
+    page-break-after: auto !important;
+  }
+}

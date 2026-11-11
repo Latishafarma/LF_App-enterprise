@@ -1,0 +1,2719 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Latisha Farma V7.2 Enterprise - Kasir POS, Apotek & Inventori</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome 6 Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- React & React DOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <!-- Supabase JS Client -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Babel for JSX compilation -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        
+        @media print {
+            body * { 
+                visibility: hidden; 
+                background: transparent !important;
+                color: black !important;
+                box-shadow: none !important;
+            }
+            #printable-modal, #printable-modal * { 
+                visibility: visible; 
+            }
+            #printable-modal { 
+                position: absolute; 
+                left: 0; 
+                top: 0; 
+                width: 100%; 
+                margin: 0;
+                padding: 10px;
+                background: white !important;
+                border: none !important;
+            }
+            .no-print { display: none !important; }
+        }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-800 antialiased selection:bg-indigo-500 selection:text-white">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo, useRef } = React;
+
+        // --- INISIALISASI SUPABASE CLIENT ---
+        const SUPABASE_URL = 'https://tlkrsqphxoztcujdodrm.supabase.co';
+        const SUPABASE_ANON_KEY = 'sb_publishable_GH-GwUTgqfHbcucCAZZVaw_XABRIz0Y';
+        const supabaseClient = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+
+        // --- MASTER DATA AWAL (FALLBACK JIKA DATABASE BELUM TERISI) ---
+        const INITIAL_MEDICINES = [
+            { id: 'OBT-001', barcode: '899123456001', name: 'Paracetamol 500mg', category: 'Obat Bebas', form: 'Tablet', unit: 'Strip', satuanKecil: 'Strip', satuanBesar: 'Box', rasioKonversi: 10, sellPrice: 5000, sellPriceKlinik: 4800, sellPriceMitra: 4500, minStock: 20, maxStock: 200, batchNo: 'BTC-2026A', hna: 2883, hpp: 3200, stock: 120, expDate: '2027-10-15', rack: 'Rak A-1', supplier: 'PT Kimia Farma Trading' },
+            { id: 'OBT-002', barcode: '899123456002', name: 'Amoxicillin 500mg', category: 'Obat Keras', form: 'Kaplet', unit: 'Strip', satuanKecil: 'Strip', satuanBesar: 'Box', rasioKonversi: 10, sellPrice: 12000, sellPriceKlinik: 11000, sellPriceMitra: 10500, minStock: 15, maxStock: 150, batchNo: 'BTC-2026B', hna: 7658, hpp: 8500, stock: 12, expDate: '2026-11-20', rack: 'Rak B-3', supplier: 'PT Bina San Prima' },
+            { id: 'OBT-003', barcode: '899123456003', name: 'OBH Combi Sirup 100ml', category: 'Obat Bebas Terbatas', form: 'Sirup', unit: 'Botol', satuanKecil: 'Botol', satuanBesar: 'Karton', rasioKonversi: 24, sellPrice: 22500, sellPriceKlinik: 21000, sellPriceMitra: 20000, minStock: 10, maxStock: 80, batchNo: 'BTC-2025C', hna: 14414, hpp: 16000, stock: 8, expDate: '2026-12-05', rack: 'Rak C-2', supplier: 'PT Anugrah Argon Medica' },
+            { id: 'OBT-004', barcode: '899123456004', name: 'Cefadroxil 500mg', category: 'Obat Keras', form: 'Kapsul', unit: 'Strip', satuanKecil: 'Strip', satuanBesar: 'Box', rasioKonversi: 10, sellPrice: 18000, sellPriceKlinik: 17000, sellPriceMitra: 16000, minStock: 10, maxStock: 100, batchNo: 'BTC-2025D', hna: 11261, hpp: 12500, stock: 4, expDate: '2027-05-10', rack: 'Rak B-1', supplier: 'PT Dexa Medica' }
+        ];
+
+        const INITIAL_STOCK_MUTATIONS = [
+            { id: 'MUT-01', date: '2026-10-25', medicineId: 'OBT-001', refNo: 'FB/2026/001', type: 'PEMBELIAN', inQty: 100, outQty: 0, balance: 100, ket: 'Pembelian dari PT Kimia Farma', petugas: 'apt. Mardin' },
+            { id: 'MUT-02', date: '2026-10-28', medicineId: 'OBT-001', refNo: 'TRX-1001', type: 'PENJUALAN', inQty: 0, outQty: 10, balance: 90, ket: 'Penjualan Resep / OTC Umum', petugas: 'Kasir POS' }
+        ];
+
+        const INITIAL_DOCTORS = [
+            { id: 'DOC-001', name: 'Internal', sip: 'SIP/2024/001-KNA', commissionType: 'persentase', commissionValue: 10, earnedCommission: 240000 },
+            { id: 'DOC-002', name: 'dr. Pratama, Sp.PD', sip: 'SIP/2024/002-KNA', commissionType: 'persentase', commissionValue: 10, earnedCommission: 180000 }
+        ];
+
+        const INITIAL_PATIENTS = [
+            { id: 'RM-001', nik: '1601002930291', name: 'Regular', phone: '081299887766' },
+            { id: 'RM-002', nik: '1601002930292', name: 'Tn. Ahmad Dahlan', phone: '081377665544' }
+        ];
+
+        const INITIAL_TRANSACTIONS = [
+            {
+                id: 'TRX-1001',
+                date: new Date(Date.now() - 86400000 * 2).toLocaleString('id-ID'),
+                type: 'REGULER',
+                kasir: 'apt. Mardin, S.Farm',
+                customerName: 'Regular',
+                subtotal: 25000,
+                discount: 0,
+                total: 25000,
+                payAmount: 30000,
+                change: 5000,
+                hppTotal: 16000,
+                profit: 9000,
+                doctorName: 'Internal',
+                paymentMethod: 'Tunai (Tunai)',
+                description: 'Penjualan OTC',
+                items: [{ id: 'OBT-001', name: 'Paracetamol 500mg', qty: 5, unit: 'Strip', tuslah: 0, price: 5000, discount: 0, subtotal: 25000 }]
+            }
+        ];
+
+        const INITIAL_SUPPLIERS = [
+            { id: 'SUP-001', name: 'PT Kimia Farma Trading', phone: '021-5551234', address: 'Jakarta Central' }
+        ];
+
+        const INITIAL_EMPLOYEES = [
+            { id: 'EMP-001', name: 'apt. Mardin, S.Farm', role: 'Super Admin / APJ', phone: '081234567890', status: 'Aktif' },
+            { id: 'EMP-002', name: 'Siti Rahma, A.Md.Far', role: 'Apoteker / Kasir', phone: '081987654321', status: 'Aktif' }
+        ];
+
+        const INITIAL_ROLES = [
+            { id: 'ROL-001', name: 'Super Admin', access: ['Dashboard', 'POS Kasir', 'Inventori', 'Setup', 'Keuangan & Audit'], desc: 'Akses penuh seluruh sistem' },
+            { id: 'ROL-002', name: 'Kasir / Farmasi', access: ['POS Kasir', 'Inventori'], desc: 'Akses terbatas untuk POS dan stok' }
+        ];
+
+        const INITIAL_CUST_CATEGORIES = [
+            { id: 'CCAT-01', name: 'Reguler / Umum', discount: '0%', desc: 'Pelanggan umum tanpa diskon khusus' },
+            { id: 'CCAT-02', name: 'Member / Mitra Nakes', discount: '5%', desc: 'Pelanggan terdaftar atau tenaga kesehatan' }
+        ];
+
+        const INITIAL_PROD_CATEGORIES = [
+            { id: 'PCAT-01', name: 'Obat Bebas', desc: 'Dapat dibeli bebas tanpa resep' },
+            { id: 'PCAT-02', name: 'Obat Keras', desc: 'Membutuhkan resep dokter' },
+            { id: 'PCAT-03', name: 'Alat Kesehatan', desc: 'Alat medis dan perlengkapan' }
+        ];
+
+        const INITIAL_UNITS = [
+            { id: 'UNT-01', largeUnit: 'Box', smallUnit: 'Strip', conversion: 10, desc: '1 Box isi 10 Strip' },
+            { id: 'UNT-02', largeUnit: 'Strip', smallUnit: 'Tablet', conversion: 10, desc: '1 Strip isi 10 Tablet' },
+            { id: 'UNT-03', largeUnit: 'Karton', smallUnit: 'Botol', conversion: 24, desc: '1 Karton isi 24 Botol' }
+        ];
+
+       // --- APLIKASI UTAMA ---
+        function App() {
+            const [isLoggedIn, setIsLoggedIn] = useState(true);
+            const [role, setRole] = useState('ADMIN'); 
+            const [username, setUsername] = useState('apt. Mardin, S.Farm (APJ)');
+            const [activeTab, setActiveTab] = useState('pos-kasir');
+
+            const [medicines, setMedicines] = useState(INITIAL_MEDICINES);
+            const [stockMutations, setStockMutations] = useState(INITIAL_STOCK_MUTATIONS);
+            const [doctors] = useState(INITIAL_DOCTORS);
+            const [patients] = useState(INITIAL_PATIENTS);
+            const [ePrescriptions, setEPrescriptions] = useState([
+                {
+                    id: 'RX-9921',
+                    rmId: 'RM-001',
+                    patientName: 'Tn. Ahmad Dahlan',
+                    doctorName: 'dr. Pratama, Sp.PD',
+                    items: [{ name: 'Paracetamol 500mg', qty: 10, dosage: '3x1 Tablet Sesudah Makan' }],
+                    status: 'Pending Skrining',
+                    timestamp: '09:45'
+                }
+            ]);
+
+            const [purchaseInvoices, setPurchaseInvoices] = useState([
+                {
+                    id: 'INV-PBF-2026-001',
+                    pbfName: 'PT Anugrah Argon Medica',
+                    invoiceNo: 'AAM-99210',
+                    date: '2026-10-25',
+                    dueDate: '2026-11-24',
+                    salesman: 'Budi Santoso',
+                    term: '30 Hari',
+                    items: [
+                        { name: 'Paracetamol 500mg', qty: 20, unit: 'Box', batchNo: 'B2601A', expDate: '2028-12-31', price: 45000, disc: 0, subtotal: 900000 }
+                    ],
+                    dpp: 900000,
+                    ppn: 99000,
+                    totalTagihan: 999000,
+                    status: 'Lunas'
+                }
+            ]);
+
+            const [completedPrescriptions, setCompletedPrescriptions] = useState([
+                {
+                    id: 'RX-9920',
+                    patientName: 'Ny. Siti Aminah',
+                    doctorName: 'dr. Pratama, Sp.PD',
+                    timestamp: '2026-10-28 08:30',
+                    status: 'Selesai / Terkirim ke POS',
+                    items: [{ name: 'Amoxicillin 500mg', qty: 15, dosage: '3x1 Kapsul' }],
+                    screeningNotes: 'Lolos Skrining Administratif, Farmasetik & Klinis'
+                }
+            ]);
+
+            const [transactions, setTransactions] = useState(INITIAL_TRANSACTIONS);
+            const [suppliers] = useState(INITIAL_SUPPLIERS);
+            const [auditLogs, setAuditLogs] = useState([
+                { time: new Date().toLocaleTimeString('id-ID'), role: 'SYSTEM', module: 'Init', detail: 'Sistem Utama Latisha Farma V7.2 Berhasil Dijalankan' }
+            ]);
+			
+            const [employees, setEmployees] = useState(INITIAL_EMPLOYEES);
+            const [rolesList, setRolesList] = useState(INITIAL_ROLES);
+            const [custCategories, setCustCategories] = useState(INITIAL_CUST_CATEGORIES);
+            const [prodCategories, setProdCategories] = useState(INITIAL_PROD_CATEGORIES);
+            const [unitsList, setUnitsList] = useState(INITIAL_UNITS);
+
+            const [activePrescriptionForPOS, setActivePrescriptionForPOS] = useState(null);
+
+            // --- SINKRONISASI GLOBAL MASTER PRICE & SETUP DARI SUPABASE SAAT REFRESH ---
+            useEffect(() => {
+                let isMounted = true;
+                if (!supabaseClient) return;
+
+                async function fetchGlobalData() {
+                    try {
+                        const { data: priceData, error: priceError } = await supabaseClient.from('master_price').select('*');
+                        if (priceError) throw priceError;
+                        if (priceData && priceData.length > 0 && isMounted) {
+                            const mappedMedicines = priceData.map(item => ({
+                                id: item.id || Date.now(),
+                                name: item.nama_obat || 'Tanpa Nama',
+                                unit: item.satuan || 'Strip',
+                                satuanBesar: item.satuan_besar || 'Box',
+                                satuanKecil: item.satuan || 'Strip',
+                                rasioKonversi: Number(item.rasio_konversi || item.konversi) || 10,
+                                hnaBesar: Number(item.hna) || 0,
+                                hpp: Number(item.hpp) || 0,
+                                sellPrice: Number(item.sales_price) || 0,
+                                sellPriceKlinik: Number(item.harga_klinik || item.sellPriceKlinik) || Math.round((Number(item.sales_price) || 0) * 0.95),
+                                sellPriceMitra: Number(item.harga_mitra || item.sellPriceMitra) || Math.round((Number(item.sales_price) || 0) * 0.90),
+                                stock: Number(item.stok) || 0,
+                                minStock: 10,
+                                maxStock: 100,
+                                batchNo: item.batch_no || 'BTC-SYNC',
+                                expDate: item.exp_date || '2028-01-01',
+                                isTieredActive: item.is_tiered_active || false,
+                                tieredConfig: item.tiered_config ? (typeof item.tiered_config === 'string' ? JSON.parse(item.tiered_config) : item.tiered_config) : {
+                                    terkecil: { pasien: { active: false, markup: 90 }, mitra: { active: false, markup: 80 } },
+                                    besar: { pasien: { active: false, markup: 90 }, mitra: { active: false, markup: 80 } }
+                                }
+                            }));
+                            setMedicines(mappedMedicines);
+                        }
+
+                        const { data: empData } = await supabaseClient.from('pegawai').select('*');
+                        if (empData && empData.length > 0 && isMounted) setEmployees(empData);
+
+                        const { data: roleData } = await supabaseClient.from('roles').select('*');
+                        if (roleData && roleData.length > 0 && isMounted) setRolesList(roleData);
+
+                        const { data: ccatData } = await supabaseClient.from('kategori_pelanggan').select('*');
+                        if (ccatData && ccatData.length > 0 && isMounted) setCustCategories(ccatData);
+
+                        const { data: pcatData } = await supabaseClient.from('kategori_produk').select('*');
+                        if (pcatData && pcatData.length > 0 && isMounted) setProdCategories(pcatData);
+
+                        const { data: unitData } = await supabaseClient.from('satuan_konversi').select('*');
+                        if (unitData && unitData.length > 0 && isMounted) {
+                            const mappedUnits = unitData.map(u => ({
+                                id: u.id,
+                                largeUnit: u.large_unit || u.largeUnit,
+                                smallUnit: u.small_unit || u.smallUnit,
+                                conversion: u.conversion,
+                                desc: u.description || u.desc
+                            }));
+                            setUnitsList(mappedUnits);
+                        }
+                    } catch (err) {
+                        console.error("Gagal sinkronisasi data global dengan Supabase:", err);
+                    }
+                }
+
+                fetchGlobalData();
+                return () => { isMounted = false; };
+            }, []);
+
+            const addAuditLog = (module, detail) => {
+                const newLog = {
+                    time: new Date().toLocaleTimeString('id-ID'),
+                    role,
+                    module,
+                    detail
+                };
+                setAuditLogs(prev => [newLog, ...prev]);
+            };
+
+            const handleLogin = (e) => {
+                e.preventDefault();
+                setIsLoggedIn(true);
+                addAuditLog('Auth Login', `Pengguna ${username} berhasil masuk dengan Role ${role}`);
+            };
+
+            const handleLogout = () => {
+                setIsLoggedIn(false);
+            };
+
+            const handleOpenV721 = () => {
+                window.open('latisha_v7_2_1.html', '_blank');
+                addAuditLog('Navigasi', 'Membuka aplikasi Latisha V7.2.1 di tab baru');
+            };
+
+            if (!isLoggedIn) {
+                return (
+                    <div className="fixed inset-0 bg-slate-950 flex items-center justify-center z-50 p-4">
+                        <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl overflow-hidden border border-slate-800">
+                            <div className="p-8 text-center bg-slate-900 border-b border-slate-800 space-y-3">
+                                <div className="w-16 h-16 mx-auto bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-lg text-2xl font-bold">
+                                    <i className="fa-solid fa-square-plus text-3xl"></i>
+                                </div>
+                                <div>
+                                    <h1 className="text-xl font-black text-white tracking-wide">LATISHA FARMA V7.2</h1>
+                                    <p className="text-xs text-emerald-400 font-semibold mt-0.5">Enterprise Pharmacy & POS System</p>
+                                </div>
+                            </div>
+                            <form onSubmit={handleLogin} className="p-8 space-y-4 text-xs">
+                                <div>
+                                    <label className="block font-bold text-slate-700 mb-1">Pilih Mode Hak Akses (Role)</label>
+                                    <select 
+                                        value={role} 
+                                        onChange={(e) => setRole(e.target.value)} 
+                                        className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl font-bold bg-slate-50 text-slate-800 focus:ring-2 focus:ring-indigo-500"
+                                    >
+                                        <option value="ADMIN">Super Admin / APJ / Owner (Akses Penuh)</option>
+                                        <option value="FARMASI">Apoteker / Kasir POS & FEFO Stok</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block font-bold text-slate-700 mb-1">Nama Petugas / ID User</label>
+                                    <input 
+                                        type="text" 
+                                        value={username} 
+                                        onChange={(e) => setUsername(e.target.value)}
+                                        required 
+                                        className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl font-semibold focus:ring-2 focus:ring-indigo-500" 
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block font-bold text-slate-700 mb-1">PIN / Password Sistem</label>
+                                    <input 
+                                        type="password" 
+                                        defaultValue="123456" 
+                                        required 
+                                        className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500" 
+                                    />
+                                </div>
+                                <button type="submit" className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-xl shadow-lg transition text-xs tracking-wider uppercase">
+                                    <i className="fa-solid fa-right-to-bracket mr-2"></i> Masuk ke Sistem Utama V7.2
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="flex h-screen overflow-hidden">
+                    {/* SIDEBAR NAVIGATION */}
+                    <aside className="w-64 bg-slate-900 text-slate-300 flex flex-col justify-between border-r border-slate-800 shrink-0">
+                        <div>
+                            <div className="p-4 border-b border-slate-800 flex items-center gap-3">
+                                <div className="bg-indigo-600 text-white p-2.5 rounded-xl font-bold shadow-md">
+                                    <i className="fa-solid fa-capsules text-xl"></i>
+                                </div>
+                                <div>
+                                    <h1 className="font-extrabold text-white text-sm tracking-tight">Latisha Farma</h1>
+                                    <p className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider">V7.2 Enterprise POS</p>
+                                </div>
+                            </div>
+
+                            <nav className="p-3 space-y-1 text-xs font-medium custom-scrollbar overflow-y-auto max-h-[calc(100vh-170px)]">
+                            <div className="pb-3 border-b border-slate-800">
+                                <button 
+                                    onClick={handleOpenV721}
+                                    className="w-full flex items-center justify-between gap-2 px-3 py-3 rounded-xl bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500 text-white font-black shadow-md transition text-xs"
+                                >
+                                    <span className="flex items-center gap-2">
+                                        <i className="fa-solid fa-user-doctor text-sm"></i> Buka Praktek Dokter
+                                    </span>
+                                    <i className="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
+                                </button>
+                            </div>
+
+                            <div className="pt-2">
+                                <button 
+                                    onClick={() => setActiveTab('dashboard')} 
+                                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition ${activeTab === 'dashboard' ? 'bg-indigo-600 text-white font-bold shadow-sm' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}
+                                >
+                                    <i className="fa-solid fa-chart-line w-4 text-indigo-400"></i> Dashboard Executive
+                                </button>
+                            </div>
+
+                            {/* MODUL 1: KASIR POS (Hanya Kasir Murni) */}
+                            {(role === 'ADMIN' || role === 'FARMASI') && (
+                                <div className="pt-2">
+                                    <p className="px-3 text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">1. Kasir POS</p>
+                                    <button onClick={() => setActiveTab('pos-kasir')} className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg transition ${activeTab === 'pos-kasir' ? 'bg-slate-800 text-white font-bold' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}>
+                                        <i className="fa-solid fa-cash-register text-emerald-400 w-4"></i> Form POS Kasir Utama
+                                    </button>
+                                </div>
+                            )}
+
+                            {/* MODUL 2: FARMASI, STOK & E-RESEP */}
+                            {(role === 'ADMIN' || role === 'FARMASI') && (
+                                <div className="pt-2">
+                                    <p className="px-3 text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">2. Farmasi & E-Resep</p>
+                                    <button onClick={() => setActiveTab('inventory')} className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg transition ${activeTab === 'inventory' ? 'bg-slate-800 text-white font-bold' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}>
+                                        <i className="fa-solid fa-boxes-stacked text-sky-400 w-4"></i> Master Price List & Batch
+                                    </button>
+                                    <button onClick={() => setActiveTab('pos-resep-masuk')} className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg transition ${activeTab === 'pos-resep-masuk' ? 'bg-slate-800 text-white font-bold' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}>
+                                        <i className="fa-solid fa-file-prescription text-amber-400 w-4"></i> E-Prescription Queue
+                                        {ePrescriptions.filter(e => e.status === 'Pending Skrining').length > 0 && (
+                                            <span className="ml-auto bg-amber-500 text-slate-950 text-[9px] px-1.5 py-0.5 rounded-full font-black animate-pulse">
+                                                {ePrescriptions.filter(e => e.status === 'Pending Skrining').length}
+                                            </span>
+                                        )}
+                                    </button>
+                                    <button onClick={() => setActiveTab('purchase-invoice')} className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg transition ${activeTab === 'purchase-invoice' ? 'bg-slate-800 text-white font-bold' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}>
+                                        <i className="fa-solid fa-truck-medical text-emerald-400 w-4"></i> Pembelian & Faktur PBF
+                                    </button>
+                                    <button onClick={() => setActiveTab('pos-riwayat-skrining')} className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg transition ${activeTab === 'pos-riwayat-skrining' ? 'bg-slate-800 text-white font-bold' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}>
+                                        <i className="fa-solid fa-clock-rotate-left text-teal-400 w-4"></i> Riwayat Skrining Resep
+                                    </button>
+                                </div>
+                            )}
+
+                            {/* MODUL 3: SETUP SISTEM */}
+                            {role === 'ADMIN' && (
+                                <div className="pt-2">
+                                    <p className="px-3 text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">3. Modul Setup</p>
+                                    <button onClick={() => setActiveTab('setup-pegawai')} className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg transition ${activeTab === 'setup-pegawai' ? 'bg-slate-800 text-white font-bold' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}>
+                                        <i className="fa-solid fa-users text-cyan-400 w-4"></i> Pegawai
+                                    </button>
+                                    <button onClick={() => setActiveTab('setup-role')} className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg transition ${activeTab === 'setup-role' ? 'bg-slate-800 text-white font-bold' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}>
+                                        <i className="fa-solid fa-user-shield text-yellow-400 w-4"></i> Role & Batas Akses
+                                    </button>
+                                    <button onClick={() => setActiveTab('setup-kategori-pelanggan')} className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg transition ${activeTab === 'setup-kategori-pelanggan' ? 'bg-slate-800 text-white font-bold' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}>
+                                        <i className="fa-solid fa-tags text-pink-400 w-4"></i> Kategori Pelanggan
+                                    </button>
+                                    <button onClick={() => setActiveTab('setup-kategori-produk')} className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg transition ${activeTab === 'setup-kategori-produk' ? 'bg-slate-800 text-white font-bold' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}>
+                                        <i className="fa-solid fa-boxes-packing text-orange-400 w-4"></i> Kategori Produk
+                                    </button>
+                                    <button onClick={() => setActiveTab('setup-satuan')} className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg transition ${activeTab === 'setup-satuan' ? 'bg-slate-800 text-white font-bold' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}>
+                                        <i className="fa-solid fa-scale-balanced text-emerald-400 w-4"></i> Satuan & Konversi
+                                    </button>
+                                </div>
+                            )}
+
+                            {/* MODUL 4: KEUANGAN & AUDIT */}
+                            {role === 'ADMIN' && (
+                                <div className="pt-2">
+                                    <p className="px-3 text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">4. Keuangan & Audit</p>
+                                    <button onClick={() => setActiveTab('keuangan-fee')} className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg transition ${activeTab === 'keuangan-fee' ? 'bg-slate-800 text-white font-bold' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}>
+                                        <i className="fa-solid fa-hand-holding-dollar text-emerald-400 w-4"></i> Komisi Dokter
+                                    </button>
+                                    <button onClick={() => setActiveTab('sys-audit')} className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg transition ${activeTab === 'sys-audit' ? 'bg-slate-800 text-white font-bold' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}>
+                                        <i className="fa-solid fa-shield-halved text-purple-400 w-4"></i> Audit Trail & Log
+                                    </button>
+                                </div>
+                            )}
+                        </nav>
+                        </div>
+
+                        <div className="p-3 border-t border-slate-800 text-[11px] text-slate-500 flex justify-between items-center bg-slate-950">
+                            <span className="flex items-center gap-1.5 font-bold"><i className="fa-solid fa-circle text-emerald-500 text-[8px] animate-ping"></i> POS Online</span>
+                            <button onClick={handleLogout} className="text-rose-400 hover:text-rose-300 font-bold transition">
+                                <i className="fa-solid fa-power-off mr-1"></i> Logout
+                            </button>
+                        </div>
+                    </aside>
+
+                    {/* MAIN APPLICATION CONTENT BODY */}
+                    <div className="flex-1 flex flex-col overflow-hidden">
+                        <header className="bg-white border-b border-slate-200 px-6 py-3 flex justify-between items-center shadow-xs shrink-0">
+                            <div className="flex items-center gap-3">
+                                <span className="bg-indigo-50 text-indigo-700 px-3 py-1 rounded-xl text-xs font-black uppercase tracking-wider">
+                                    <i className="fa-solid fa-folder-open mr-1.5"></i> Modul Utama: {activeTab.replace('-', ' ')}
+                                </span>
+                            </div>
+                            <div className="flex items-center gap-4 text-xs">
+                                <button 
+                                    onClick={handleOpenV721}
+                                    className="px-3 py-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded-xl font-bold transition flex items-center gap-1.5 shadow-xs"
+                                >
+                                    <i className="fa-solid fa-user-doctor"></i> Buka Praktek Dokter (V7.2.1)
+                                </button>
+                                <div className="text-right border-l pl-4">
+                                    <span className="block font-bold text-slate-800">{username}</span>
+                                    <span className="block text-[10px] text-emerald-600 font-black">Role: {role}</span>
+                                </div>
+                                <div className="w-9 h-9 rounded-2xl bg-indigo-600 text-white flex items-center justify-center font-black shadow-md">
+                                    {role.substring(0, 2)}
+                                </div>
+                            </div>
+                        </header>
+
+                        <main className="flex-1 overflow-y-auto p-4 bg-slate-100 custom-scrollbar">
+                            {activeTab === 'dashboard' && (
+                                <DashboardView medicines={medicines} transactions={transactions} ePrescriptions={ePrescriptions} />
+                            )}
+                            {activeTab === 'pos-kasir' && (
+                                <POSCashierView 
+                                    medicines={medicines} 
+                                    setMedicines={setMedicines} 
+                                    patients={patients} 
+                                    doctors={doctors} 
+                                    transactions={transactions} 
+                                    setTransactions={setTransactions} 
+                                    addAuditLog={addAuditLog} 
+                                    activePrescriptionForPOS={activePrescriptionForPOS}
+                                    setActivePrescriptionForPOS={setActivePrescriptionForPOS}
+                                    setStockMutations={setStockMutations}
+                                    stockMutations={stockMutations}
+                                />
+                            )}
+                            {activeTab === 'pos-resep-masuk' && (
+                                <EPrescriptionQueueView 
+                                    ePrescriptions={ePrescriptions}
+                                    setEPrescriptions={setEPrescriptions}
+                                    setActiveTab={setActiveTab} 
+                                    setActivePrescriptionForPOS={setActivePrescriptionForPOS}
+                                />
+                            )}
+                            {/* MODUL INVENTORI & FARMASI */}
+                            {activeTab === 'inventory' && (
+                                <InventoryView 
+                                    medicines={medicines} 
+                                    setMedicines={setMedicines} 
+                                    unitsList={unitsList} 
+                                    addAuditLog={addAuditLog} 
+                                />
+                            )}
+                            {activeTab === 'inv-kartu-stok' && (
+                                <StockCardView medicines={medicines} stockMutations={stockMutations} />
+                            )}
+                            {activeTab === 'inv-defecta' && (
+                                <DefectaView medicines={medicines} suppliers={suppliers} />
+                            )}
+                            {activeTab === 'purchase-invoice' && (
+                                <PurchaseInvoiceView 
+                                    purchaseInvoices={purchaseInvoices} 
+                                    setPurchaseInvoices={setPurchaseInvoices} 
+                                    medicines={medicines}
+                                    setMedicines={setMedicines}
+                                    addAuditLog={addAuditLog}
+                                />
+                            )}
+                            {/* MODUL SETUP */}
+                            {activeTab === 'setup-pegawai' && (
+                                <SetupPegawaiView employees={employees} setEmployees={setEmployees} addAuditLog={addAuditLog} />
+                            )}
+                            {activeTab === 'setup-role' && (
+                                <SetupRoleView rolesList={rolesList} setRolesList={setRolesList} addAuditLog={addAuditLog} />
+                            )}
+                            {activeTab === 'setup-kategori-pelanggan' && (
+                                <SetupKategoriPelangganView custCategories={custCategories} setCustCategories={setCustCategories} addAuditLog={addAuditLog} />
+                            )}
+                            {activeTab === 'setup-kategori-produk' && (
+                                <SetupKategoriProdukView prodCategories={prodCategories} setProdCategories={setProdCategories} addAuditLog={addAuditLog} />
+                            )}
+                            {activeTab === 'setup-satuan' && (
+                                <SetupSatuanView unitsList={unitsList} setUnitsList={setUnitsList} addAuditLog={addAuditLog} />
+                            )}
+
+                            {activeTab === 'keuangan-fee' && (
+                                <DoctorCommissionView doctors={doctors} transactions={transactions} />
+                            )}
+                            {activeTab === 'sys-audit' && (
+                                <AuditTrailView auditLogs={auditLogs} />
+                            )}
+                            {activeTab === 'pos-riwayat-skrining' && (
+                                <ScreeningHistoryView 
+                                    completedPrescriptions={completedPrescriptions} 
+                                    setCompletedPrescriptions={setCompletedPrescriptions} 
+                                />
+                            )}
+                        </main>
+                    </div>
+                </div>
+            );
+        }
+
+        // ==========================================
+        // SUB-KOMPONEN LENGKAP APLIKASI V7.2
+        // ==========================================
+
+        // 1. DASHBOARD VIEW
+        function DashboardView({ medicines, transactions, ePrescriptions }) {
+            const chartRef = useRef(null);
+            const totalRevenue = transactions.reduce((acc, t) => acc + t.total, 0);
+            const totalProfit = transactions.reduce((acc, t) => acc + (t.profit || 0), 0);
+            const lowStockCount = medicines.filter(m => m.stock <= m.minStock).length;
+            const pendingResep = ePrescriptions.filter(e => e.status === 'Pending Skrining').length;
+
+            useEffect(() => {
+                if (chartRef.current) {
+                    const ctx = chartRef.current.getContext('2d');
+                    const existing = Chart.getChart(chartRef.current);
+                    if (existing) existing.destroy();
+
+                    new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'],
+                            datasets: [
+                                {
+                                    label: 'Omzet Penjualan (Rp)',
+                                    data: [1500000, 2100000, 1800000, 2700000, 2300000, 3400000, totalRevenue || 2900000],
+                                    borderColor: '#4f46e5',
+                                    backgroundColor: 'rgba(79, 70, 229, 0.1)',
+                                    fill: true,
+                                    tension: 0.3
+                                },
+                                {
+                                    label: 'Estimasi Net Profit (Rp)',
+                                    data: [500000, 750000, 600000, 950000, 800000, 1200000, totalProfit || 900000],
+                                    borderColor: '#10b981',
+                                    backgroundColor: 'rgba(16, 185, 129, 0.05)',
+                                    fill: true,
+                                    tension: 0.3
+                                }
+                            ]
+                        },
+                        options: { responsive: true, maintainAspectRatio: false }
+                    });
+                }
+            }, [totalRevenue, totalProfit]);
+
+            return (
+                <div className="space-y-6">
+                    <div className="grid grid-cols-3 gap-4">
+                        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
+                            <span className="text-xs text-slate-500 font-bold uppercase tracking-wider">Omzet Penjualan Total</span>
+                            <h4 className="text-2xl font-black text-slate-800 mt-1">Rp {totalRevenue.toLocaleString()}</h4>
+                            <span className="text-[10px] text-emerald-600 font-bold flex items-center gap-1 mt-1">
+                                <i className="fa-solid fa-circle-check"></i> {transactions.length} Struk Terbayar
+                            </span>
+                        </div>
+                        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
+                            <span className="text-xs text-slate-500 font-bold uppercase tracking-wider">Laba Bersih (Estimasi)</span>
+                            <h4 className="text-2xl font-black text-emerald-600 mt-1">Rp {totalProfit.toLocaleString()}</h4>
+                            <span className="text-[10px] text-slate-500 font-bold mt-1 block">Margin Rata-rata 32%</span>
+                        </div>
+                        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
+                            <span className="text-xs text-slate-500 font-bold uppercase tracking-wider">Resep E-Prescription</span>
+                            <h4 className="text-2xl font-black text-amber-500 mt-1">{pendingResep} Resep</h4>
+                            <span className="text-[10px] text-amber-600 font-bold block mt-1">Menunggu Skrining Kasir</span>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-6">
+                        <div className="col-span-2 bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
+                            <h4 className="font-bold text-xs text-slate-700 mb-4 uppercase tracking-wider">Grafik Kinerja Omzet & Profitabilitas 7 Hari</h4>
+                            <div className="h-72">
+                                <canvas ref={chartRef}></canvas>
+                            </div>
+                        </div>
+
+                        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-4">
+                            <h4 className="font-bold text-xs text-slate-700 flex items-center gap-2 border-b pb-3 uppercase tracking-wider">
+                                <i className="fa-solid fa-triangle-exclamation text-rose-500"></i> Peringatan Stok & Expired FEFO
+                            </h4>
+                            <div className="space-y-2.5 max-h-64 overflow-y-auto custom-scrollbar text-xs">
+                                {lowStockCount === 0 ? (
+                                    <p className="text-slate-400 italic">Semua stok berada di atas batas buffer aman.</p>
+                                ) : (
+                                    medicines.filter(m => m.stock <= m.minStock).map(m => (
+                                        <div key={m.id} className="p-3 bg-rose-50 border border-rose-200 rounded-xl flex justify-between items-center">
+                                            <div>
+                                                <span className="font-bold text-rose-900 block">{m.name}</span>
+                                                <span className="text-slate-600 text-[11px]">Sisa: <strong className="text-rose-700">{m.stock} {m.unit}</strong> (Min: {m.minStock})</span>
+                                            </div>
+                                            <span className="px-2 py-1 bg-rose-200 text-rose-800 rounded font-black text-[10px]">ORDER</span>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // 2. POS CASHIER VIEW (TERBENTUK KEMBALI SECARA PRESISI & BEBAS KACAU)
+        function POSCashierView({ medicines, setMedicines, patients, doctors, transactions, setTransactions, addAuditLog, activePrescriptionForPOS, setActivePrescriptionForPOS, setStockMutations, stockMutations }) {
+            const [posJalur, setPosJalur] = useState('REGULER'); 
+            const [customer, setCustomer] = useState('Regular');
+            const [doctor, setDoctor] = useState('Internal');
+
+            const [pluInput, setPluInput] = useState('');
+            const [selectedMed, setSelectedMed] = useState(null);
+            const [tuslah, setTuslah] = useState(0);
+            const [qty, setQty] = useState(1);
+            const [unit, setUnit] = useState('');
+            const [choosePrice, setChoosePrice] = useState('Harga Jual 1');
+            const [price, setPrice] = useState(0);
+            const [itemDiscount, setItemDiscount] = useState(0);
+
+            const [cart, setCart] = useState([]);
+            const [description, setDescription] = useState('');
+            const [invoiceNo, setInvoiceNo] = useState(`INV-${Date.now().toString().slice(-6)}`);
+            const [overallDiscount, setOverallDiscount] = useState(0);
+            const [chargeCC, setChargeCC] = useState(0);
+
+            const [showPaymentModal, setShowPaymentModal] = useState(false);
+            const [paymentMethod, setPaymentMethod] = useState('Tunai');
+            const [subMethod, setSubMethod] = useState('Tunai');
+            const [payAmount, setPayAmount] = useState(0);
+
+            // RESOLVER HARGA DINAMIS (MENGAKOMODASI MASTER PRICE, HARGA MITRA, HARGA KLINIK & KONVERSI)
+            const resolveDynamicPrice = (med, priceType, targetUnit) => {
+                if (!med) return 0;
+                
+                const rasio = Number(med.rasioKonversi) || Number(med.konversi) || 1;
+                const hnaBesar = Number(med.hnaBesar || med.hna) || 0;
+                
+                const isBesar = targetUnit && med.satuanBesar && (targetUnit.trim().toLowerCase() === med.satuanBesar.trim().toLowerCase());
+                
+                const hppBesar = Math.round(hnaBesar * 1.11);
+                const hppKecil = rasio > 0 ? Math.round(hppBesar / rasio) : hppBesar;
+                
+                const salesPriceBesarDasar = Math.round(hppBesar + (hppBesar * ((med.markupPercent || 100) / 100)));
+                const salesPriceKecilDasar = Number(med.sellPrice) || (rasio > 0 ? Math.round(salesPriceBesarDasar / rasio) : salesPriceBesarDasar);
+
+                if (priceType === 'Harga Jual 3') {
+                    // JALUR MITRA
+                    const defaultMitraKecil = Number(med.sellPriceMitra || med.harga_mitra) || Math.round(salesPriceKecilDasar * 0.90);
+                    const defaultMitraBesar = Number(med.sellPriceMitraBesar) || Math.round(salesPriceBesarDasar * 0.90);
+                    return isBesar ? defaultMitraBesar : defaultMitraKecil;
+                } else if (priceType === 'Harga Jual 2') {
+                    // JALUR KLINIK / RESEP
+                    const defaultKlinikKecil = Number(med.sellPriceKlinik || med.harga_klinik) || Math.round(salesPriceKecilDasar * 0.95);
+                    const defaultKlinikBesar = Number(med.sellPriceKlinikBesar) || Math.round(salesPriceBesarDasar * 0.95);
+                    return isBesar ? defaultKlinikBesar : defaultKlinikKecil;
+                } else {
+                    // JALUR REGULER / OTC
+                    return isBesar ? (Number(med.sellPriceBesar) || salesPriceBesarDasar) : salesPriceKecilDasar;
+                }
+            };
+
+            // AUTO SWITCH OPS HARGA SESUAI JALUR POS
+            useEffect(() => {
+                let targetPriceType = 'Harga Jual 1';
+                if (posJalur === 'MITRA') targetPriceType = 'Harga Jual 3';
+                else if (posJalur === 'RESEP') targetPriceType = 'Harga Jual 2';
+                
+                setChoosePrice(targetPriceType);
+                if (selectedMed) {
+                    const activeUnit = unit || selectedMed.satuanKecil || selectedMed.unit || 'Strip';
+                    setPrice(resolveDynamicPrice(selectedMed, targetPriceType, activeUnit));
+                }
+            }, [posJalur]);
+
+            // DUKUNGAN RESEP MASUK DARI E-PRESCRIPTION QUEUE
+            useEffect(() => {
+                if (activePrescriptionForPOS) {
+                    setPosJalur('RESEP');
+                    setCustomer(activePrescriptionForPOS.patientName || 'Regular');
+                    setDoctor(activePrescriptionForPOS.doctorName || 'Internal');
+                    
+                    const loadedCart = activePrescriptionForPOS.items.map((it, i) => {
+                        const med = medicines.find(m => m.name.toLowerCase().includes(it.name.toLowerCase())) || medicines[0];
+                        const defaultUnit = med ? (med.satuanKecil || med.unit || 'Strip') : 'Strip';
+                        const selectedPrice = med ? resolveDynamicPrice(med, 'Harga Jual 2', it.unit || defaultUnit) : 5000;
+                        return {
+                            id: med ? med.id : `OBT-${i}`,
+                            name: it.name,
+                            qty: Number(it.qty) || 1,
+                            unit: it.unit || defaultUnit,
+                            tuslah: 0,
+                            price: selectedPrice,
+                            discount: 0,
+                            subtotal: selectedPrice * (Number(it.qty) || 1),
+                            hpp: med ? (med.hpp || 3000) : 3000
+                        };
+                    });
+                    setCart(loadedCart);
+                }
+            }, [activePrescriptionForPOS]);
+
+            const handleMedSelect = (med) => {
+                setSelectedMed(med);
+                setPluInput(med.name);
+                const defaultUnit = med.satuanKecil || med.unit || 'Strip';
+                setUnit(defaultUnit);
+                setPrice(resolveDynamicPrice(med, choosePrice, defaultUnit));
+            };
+
+            const handleChoosePriceChange = (val) => {
+                setChoosePrice(val);
+                if (selectedMed) {
+                    const activeUnit = unit || selectedMed.satuanKecil || selectedMed.unit || 'Strip';
+                    setPrice(resolveDynamicPrice(selectedMed, val, activeUnit));
+                }
+            };
+
+            const handleUnitChange = (newUnit) => {
+                setUnit(newUnit);
+                if (selectedMed) {
+                    setPrice(resolveDynamicPrice(selectedMed, choosePrice, newUnit));
+                }
+            };
+
+            const computedSubtotalInput = useMemo(() => {
+                return Math.max(0, (Number(price) * Number(qty)) + Number(tuslah) - Number(itemDiscount));
+            }, [price, qty, tuslah, itemDiscount]);
+
+            const handleAddItem = () => {
+                if (!selectedMed && !pluInput) {
+                    alert("Pilih atau ketik nama obat terlebih dahulu!");
+                    return;
+                }
+                const med = selectedMed || medicines.find(m => m.name.toLowerCase().includes(pluInput.toLowerCase())) || medicines[0];
+                const fallbackUnit = unit || med.satuanKecil || med.unit || 'Strip';
+                const finalPrice = price > 0 ? price : resolveDynamicPrice(med, choosePrice, fallbackUnit);
+                
+                const newItem = {
+                    id: med.id,
+                    name: med.name,
+                    qty: Number(qty) || 1,
+                    unit: fallbackUnit,
+                    tuslah: Number(tuslah) || 0,
+                    price: Number(finalPrice) || 0,
+                    discount: Number(itemDiscount) || 0,
+                    subtotal: Math.max(0, (finalPrice * (Number(qty) || 1)) + Number(tuslah) - Number(itemDiscount)),
+                    hpp: med.hpp || 0
+                };
+                
+                setCart(prev => [...prev, newItem]);
+                
+                // Reset input baris
+                setPluInput('');
+                setSelectedMed(null);
+                setTuslah(0);
+                setQty(1);
+                setPrice(0);
+                setItemDiscount(0);
+            };
+
+            const handleRemoveItem = (idx) => setCart(prev => prev.filter((_, i) => i !== idx));
+
+            const cartSubtotal = cart.reduce((acc, i) => acc + i.subtotal, 0);
+            const totalAfterDiscount = Math.max(0, cartSubtotal - Number(overallDiscount));
+            const grandTotal = totalAfterDiscount + Number(chargeCC);
+            const totalItemsCount = cart.reduce((acc, i) => acc + i.qty, 0);
+            const change = Math.max(0, payAmount - grandTotal);
+
+            const handleSaveTransaction = () => {
+                if (cart.length === 0) {
+                    alert("Keranjang belanja masih kosong!");
+                    return;
+                }
+                if (payAmount < grandTotal && paymentMethod !== 'Kredit / Debit') {
+                    alert("Nominal pembayaran kurang dari total tagihan!");
+                    return;
+                }
+
+                const newTrxId = invoiceNo || `TRX-${Date.now().toString().slice(-6)}`;
+                const newTrx = {
+                    id: newTrxId,
+                    date: new Date().toLocaleString('id-ID'),
+                    type: posJalur,
+                    kasir: 'apt. Mardin, S.Farm',
+                    customerName: customer,
+                    doctorName: doctor,
+                    subtotal: cartSubtotal,
+                    discount: Number(overallDiscount),
+                    chargeCC: Number(chargeCC),
+                    total: grandTotal,
+                    payAmount: Number(payAmount),
+                    change,
+                    paymentMethod: `${paymentMethod} (${subMethod})`,
+                    description,
+                    items: cart
+                };
+
+                const updatedMedicines = medicines.map(m => {
+                    const match = cart.find(c => c.id === m.id);
+                    if (match) return { ...m, stock: Math.max(0, m.stock - match.qty) };
+                    return m;
+                });
+
+                const newMutations = cart.map(c => ({
+                    id: `MUT-${Date.now()}-${Math.random()}`,
+                    date: new Date().toISOString().split('T')[0],
+                    medicineId: c.id,
+                    refNo: newTrxId,
+                    type: 'PENJUALAN',
+                    inQty: 0,
+                    outQty: c.qty,
+                    balance: Math.max(0, (medicines.find(m => m.id === c.id)?.stock || 0) - c.qty),
+                    ket: `Penjualan POS Jalur ${posJalur} (${customer})`,
+                    petugas: 'apt. Mardin'
+                }));
+
+                setMedicines(updatedMedicines);
+                setStockMutations(prev => [...newMutations, ...prev]);
+                setTransactions(prev => [newTrx, ...prev]);
+                addAuditLog('POS Kasir', `Transaksi #${newTrx.id} senilai Rp ${grandTotal.toLocaleString()} terbayar`);
+                
+                setShowPaymentModal(false);
+                setCart([]);
+                setActivePrescriptionForPOS(null);
+                setInvoiceNo(`INV-${Date.now().toString().slice(-6)}`);
+                setPayAmount(0);
+                setOverallDiscount(0);
+                setDescription('');
+                alert(`Transaksi #${newTrx.id} berhasil disimpan!`);
+            };
+
+            return (
+                <div className="bg-white rounded-2xl border border-slate-300 shadow-sm flex flex-col h-[85vh] text-xs font-sans select-none overflow-hidden">
+                    {/* TOP CONTROL PANEL */}
+                    <div className="p-3.5 border-b border-slate-200 bg-slate-50 space-y-3">
+                        <div className="flex flex-wrap items-center justify-between border-b border-slate-200 pb-2.5 gap-2">
+                            <div className="flex items-center gap-2">
+                                <span className="font-black text-slate-700 text-xs uppercase tracking-wider mr-1">
+                                    <i className="fa-solid fa-route mr-1.5 text-indigo-600"></i> Jalur Transaksi:
+                                </span>
+                                <button onClick={() => setPosJalur('REGULER')} className={`px-3 py-1.5 rounded-xl font-extrabold text-xs transition ${posJalur === 'REGULER' ? 'bg-indigo-600 text-white shadow-sm' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'}`}>
+                                    OTC / Reguler
+                                </button>
+                                <button onClick={() => setPosJalur('MITRA')} className={`px-3 py-1.5 rounded-xl font-extrabold text-xs transition ${posJalur === 'MITRA' ? 'bg-emerald-600 text-white shadow-sm' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'}`}>
+                                    Nakes / Mitra
+                                </button>
+                                <button onClick={() => setPosJalur('RESEP')} className={`px-3 py-1.5 rounded-xl font-extrabold text-xs transition ${posJalur === 'RESEP' ? 'bg-amber-500 text-slate-950 shadow-sm' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'}`}>
+                                    Resep Klinik
+                                </button>
+                            </div>
+                            <span className="text-[11px] font-bold text-indigo-700 bg-indigo-50 px-3 py-1 rounded-xl border border-indigo-200">
+                                Skema Harga Aktif: <strong>{choosePrice}</strong>
+                            </span>
+                        </div>
+
+                        <div className="flex justify-between items-center gap-4">
+                            <div className="flex gap-4 flex-1">
+                                <div className="flex-1">
+                                    <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-wider mb-1">Pelanggan / Pasien</label>
+                                    <input type="text" value={customer} onChange={e => setCustomer(e.target.value)} className="w-full px-3 py-1.5 border border-slate-300 rounded-xl font-bold bg-white text-slate-800 focus:ring-2 focus:ring-indigo-500 outline-none" />
+                                </div>
+                                <div className="flex-1">
+                                    <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-wider mb-1">Dokter Peresep</label>
+                                    <select value={doctor} onChange={e => setDoctor(e.target.value)} className="w-full px-3 py-1.5 border border-slate-300 rounded-xl font-bold bg-white text-slate-800 focus:ring-2 focus:ring-indigo-500 outline-none">
+                                        {doctors.map(d => (<option key={d.id} value={d.name}>{d.name}</option>))}
+                                    </select>
+                                </div>
+                            </div>
+                            <div className="text-right pl-6 border-l border-slate-300">
+                                <span className="text-xs font-bold text-slate-400 block">Total Qty: {cart.length} Jenis / {totalItemsCount} Item</span>
+                                <h1 className="text-4xl font-black text-slate-900 tracking-tight leading-none mt-1">Rp {grandTotal.toLocaleString()}</h1>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* BARIS INPUT ITEM OBAT */}
+                    <div className="p-2.5 border-b border-slate-300 bg-slate-100 grid grid-cols-12 gap-2 items-end text-[11px]">
+                        <div className="col-span-3 relative">
+                            <label className="block font-bold text-slate-600 text-[10px] mb-0.5">Pencarian PLU / Nama Obat</label>
+                            <input 
+                                type="text" 
+                                placeholder="Ketik nama atau scan barcode..." 
+                                value={pluInput} 
+                                onChange={e => {
+                                    setPluInput(e.target.value);
+                                    if (selectedMed) setSelectedMed(null);
+                                }} 
+                                className="w-full p-2 border border-slate-300 rounded-xl bg-white font-bold text-slate-800 focus:ring-2 focus:ring-indigo-500 outline-none" 
+                            />
+                            {pluInput && !selectedMed && (
+                                <div className="absolute top-full left-0 right-0 bg-white border border-slate-300 rounded-xl shadow-2xl max-h-48 overflow-y-auto z-40 mt-1">
+                                    {medicines.filter(m => 
+                                        (m.name && m.name.toLowerCase().includes(pluInput.toLowerCase())) || 
+                                        (m.barcode && m.barcode.includes(pluInput))
+                                    ).map(m => {
+                                        const pVal = resolveDynamicPrice(m, choosePrice, m.satuanKecil || m.unit);
+                                        return (
+                                            <div 
+                                                key={m.id} 
+                                                onClick={() => handleMedSelect(m)} 
+                                                className="p-2.5 hover:bg-indigo-50 cursor-pointer border-b border-slate-100 font-bold flex justify-between items-center"
+                                            >
+                                                <div>
+                                                    <span className="text-slate-800 block">{m.name}</span>
+                                                    <span className="text-[10px] text-slate-500">Stok: {m.stock} {m.unit}</span>
+                                                </div>
+                                                <span className="text-emerald-600 font-mono font-black">Rp {pVal.toLocaleString()}</span>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="col-span-1">
+                            <label className="block font-bold text-slate-600 text-[10px] mb-0.5">Tuslah (Rp)</label>
+                            <input type="number" value={tuslah} onChange={e => setTuslah(e.target.value)} className="w-full p-2 border border-slate-300 rounded-xl bg-white text-center font-bold" />
+                        </div>
+
+                        <div className="col-span-1">
+                            <label className="block font-bold text-slate-600 text-[10px] mb-0.5">Qty</label>
+                            <input type="number" min="1" value={qty} onChange={e => setQty(e.target.value)} className="w-full p-2 border border-slate-300 rounded-xl bg-white text-center font-bold" />
+                        </div>
+
+                        <div className="col-span-1">
+                            <label className="block font-bold text-slate-600 text-[10px] mb-0.5">Satuan</label>
+                            <select value={unit} onChange={e => handleUnitChange(e.target.value)} className="w-full p-2 border border-slate-300 rounded-xl bg-white font-bold">
+                                {selectedMed ? (
+                                    <>
+                                        {selectedMed.satuanKecil && <option value={selectedMed.satuanKecil}>{selectedMed.satuanKecil}</option>}
+                                        {selectedMed.satuanBesar && selectedMed.satuanBesar !== selectedMed.satuanKecil && <option value={selectedMed.satuanBesar}>{selectedMed.satuanBesar}</option>}
+                                        {(!selectedMed.satuanKecil && !selectedMed.satuanBesar) && <option value={selectedMed.unit || 'Strip'}>{selectedMed.unit || 'Strip'}</option>}
+                                    </>
+                                ) : (
+                                    <option value={unit || 'Strip'}>{unit || 'Strip'}</option>
+                                )}
+                            </select>
+                        </div>
+
+                        <div className="col-span-2">
+                            <label className="block font-bold text-slate-600 text-[10px] mb-0.5">Kategori Harga</label>
+                            <select value={choosePrice} onChange={e => handleChoosePriceChange(e.target.value)} className="w-full p-2 border border-slate-300 rounded-xl bg-white font-bold text-indigo-700">
+                                <option value="Harga Jual 1">Harga Jual 1 (Reguler)</option>
+                                <option value="Harga Jual 2">Harga Jual 2 (Klinik)</option>
+                                <option value="Harga Jual 3">Harga Jual 3 (Mitra)</option>
+                            </select>
+                        </div>
+
+                        <div className="col-span-1">
+                            <label className="block font-bold text-slate-600 text-[10px] mb-0.5">Harga @ (Rp)</label>
+                            <input type="number" value={price} onChange={e => setPrice(Number(e.target.value))} className="w-full p-2 border border-slate-300 rounded-xl bg-white text-right font-bold text-indigo-900" />
+                        </div>
+
+                        <div className="col-span-1">
+                            <label className="block font-bold text-slate-600 text-[10px] mb-0.5">Diskon (Rp)</label>
+                            <input type="number" value={itemDiscount} onChange={e => setItemDiscount(e.target.value)} className="w-full p-2 border border-slate-300 rounded-xl bg-white text-right font-bold" />
+                        </div>
+
+                        <div className="col-span-2 flex gap-1.5 items-end">
+                            <div className="flex-1">
+                                <label className="block font-bold text-slate-600 text-[10px] mb-0.5">Subtotal Item</label>
+                                <input type="text" readOnly value={`Rp ${computedSubtotalInput.toLocaleString()}`} className="w-full p-2 border border-slate-300 rounded-xl bg-slate-200 text-right font-black text-slate-800" />
+                            </div>
+                            <button onClick={handleAddItem} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-black shadow-md transition">
+                                <i className="fa-solid fa-plus"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* TABEL DAFTAR KERANJANG BELANJA */}
+                    <div className="flex-1 overflow-y-auto custom-scrollbar bg-white">
+                        <table className="w-full text-left text-xs border-collapse">
+                            <thead className="bg-slate-100 text-slate-600 font-bold sticky top-0 border-b uppercase tracking-wider text-[10px]">
+                                <tr>
+                                    <th className="p-2.5 border-r">Nama Obat / Barang</th>
+                                    <th className="p-2.5 border-r text-center w-16">Qty</th>
+                                    <th className="p-2.5 border-r text-center w-20">Satuan</th>
+                                    <th className="p-2.5 border-r text-right w-24">Tuslah</th>
+                                    <th className="p-2.5 border-r text-right w-28">Harga Satuan</th>
+                                    <th className="p-2.5 border-r text-right w-24">Diskon</th>
+                                    <th className="p-2.5 text-right w-36">Subtotal Netto</th>
+                                    <th className="p-2.5 text-center w-12">#</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y text-slate-800 font-medium">
+                                {cart.length === 0 ? (
+                                    <tr>
+                                        <td colSpan="8" className="p-12 text-center text-slate-400 italic">
+                                            <i className="fa-solid fa-basket-shopping text-3xl mb-2 block text-slate-300"></i>
+                                            Keranjang belanja kasir masih kosong. Silahkan cari obat di atas.
+                                        </td>
+                                    </tr>
+                                ) : (
+                                    cart.map((item, idx) => (
+                                        <tr key={idx} className="hover:bg-slate-50 transition">
+                                            <td className="p-2.5 border-r font-bold text-slate-900">{item.name}</td>
+                                            <td className="p-2.5 border-r text-center font-mono font-bold text-slate-800">{item.qty}</td>
+                                            <td className="p-2.5 border-r text-center uppercase text-[11px] font-semibold">{item.unit}</td>
+                                            <td className="p-2.5 border-r text-right font-mono">Rp {item.tuslah.toLocaleString()}</td>
+                                            <td className="p-2.5 border-r text-right font-mono">Rp {item.price.toLocaleString()}</td>
+                                            <td className="p-2.5 border-r text-right font-mono text-rose-600">Rp {item.discount.toLocaleString()}</td>
+                                            <td className="p-2.5 text-right font-mono font-black text-indigo-700">Rp {item.subtotal.toLocaleString()}</td>
+                                            <td className="p-2.5 text-center">
+                                                <button onClick={() => handleRemoveItem(idx)} className="text-rose-500 hover:text-rose-700 transition">
+                                                    <i className="fa-solid fa-trash-can"></i>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    ))
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {/* BOTTOM SUMMARY & ACTION FOOTER */}
+                    <div className="border-t border-slate-300 bg-slate-50 grid grid-cols-12 gap-0 text-[11px]">
+                        <div className="col-span-8 p-3 grid grid-cols-4 gap-3 border-r border-slate-300 items-center">
+                            <div>
+                                <label className="block text-[10px] font-bold text-slate-500 uppercase">Keterangan Catatan</label>
+                                <input type="text" value={description} onChange={e => setDescription(e.target.value)} placeholder="Opsional..." className="w-full p-1.5 border rounded-lg bg-white mt-0.5 font-medium" />
+                            </div>
+                            <div>
+                                <label className="block text-[10px] font-bold text-slate-500 uppercase">Nomor Invoice</label>
+                                <input type="text" value={invoiceNo} onChange={e => setInvoiceNo(e.target.value)} className="w-full p-1.5 border rounded-lg bg-white mt-0.5 font-mono font-bold text-indigo-800" />
+                            </div>
+                            <div>
+                                <label className="block text-[10px] font-bold text-slate-500 uppercase">Potongan Total (Rp)</label>
+                                <input type="number" value={overallDiscount} onChange={e => setOverallDiscount(Number(e.target.value))} className="w-full p-1.5 border rounded-lg bg-white mt-0.5 font-bold text-rose-600" />
+                            </div>
+                            <div>
+                                <label className="block text-[10px] font-bold text-slate-500 uppercase">Biaya Kartu / CC (Rp)</label>
+                                <input type="number" value={chargeCC} onChange={e => setChargeCC(Number(e.target.value))} className="w-full p-1.5 border rounded-lg bg-white mt-0.5 font-bold" />
+                            </div>
+                        </div>
+
+                        <div className="col-span-4 flex justify-end gap-2 p-3 bg-white">
+                            <button onClick={() => { setPayAmount(grandTotal); setShowPaymentModal(true); }} className="flex-1 py-2.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black rounded-xl transition shadow-md flex items-center justify-center gap-2">
+                                <i className="fa-solid fa-credit-card"></i> Detail Pembayaran
+                            </button>
+                            <button onClick={handleSaveTransaction} className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl text-xs uppercase tracking-wider transition shadow-md flex items-center justify-center gap-2">
+                                <i className="fa-solid fa-floppy-disk"></i> Simpan Transaksi
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* PAYMENT DETAIL MODAL */}
+                    {showPaymentModal && (
+                        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+                            <div className="bg-white rounded-3xl w-full max-w-xl shadow-2xl overflow-hidden border border-slate-200">
+                                <div className="px-6 py-4 bg-slate-900 text-white flex justify-between items-center">
+                                    <h3 className="font-black text-sm uppercase tracking-wider"><i className="fa-solid fa-cash-register mr-2 text-indigo-400"></i> Detail Pembayaran Transaksi</h3>
+                                    <button onClick={() => setShowPaymentModal(false)} className="text-slate-400 hover:text-white"><i className="fa-solid fa-xmark text-lg"></i></button>
+                                </div>
+                                <div className="p-6 space-y-4 text-xs">
+                                    <div>
+                                        <label className="block font-bold text-slate-700 mb-1">Metode Pembayaran Utama</label>
+                                        <div className="grid grid-cols-3 gap-2">
+                                            {['Tunai', 'Kredit / Debit', 'Digital / Nontunai'].map(m => (
+                                                <button key={m} onClick={() => setPaymentMethod(m)} className={`py-2.5 px-3 rounded-xl font-bold border transition ${paymentMethod === m ? 'bg-indigo-600 text-white border-indigo-600 shadow-md' : 'bg-slate-50 text-slate-700 border-slate-300 hover:bg-slate-100'}`}>{m}</button>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    <div className="bg-slate-50 p-4 rounded-2xl border space-y-3">
+                                        <div className="flex justify-between items-center text-sm border-b pb-2">
+                                            <span className="font-bold text-slate-600">Total Tagihan Transaksi:</span>
+                                            <span className="font-black text-indigo-900 text-lg">Rp {grandTotal.toLocaleString()}</span>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <div>
+                                                <label className="block font-bold text-slate-700 mb-1">Jumlah Uang Diterima (Rp)</label>
+                                                <input type="number" value={payAmount} onChange={e => setPayAmount(Number(e.target.value))} className="w-full p-2.5 border rounded-xl font-black text-base bg-white focus:ring-2 focus:ring-indigo-500 outline-none" />
+                                            </div>
+                                            <div>
+                                                <label className="block font-bold text-slate-700 mb-1">Kembalian (Rp)</label>
+                                                <input type="text" readOnly value={`Rp ${change.toLocaleString()}`} className="w-full p-2.5 border rounded-xl font-black text-base bg-slate-200 text-emerald-700" />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="pt-3 flex justify-end gap-2 border-t">
+                                        <button onClick={() => setShowPaymentModal(false)} className="px-5 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-xl font-bold">Batal</button>
+                                        <button onClick={handleSaveTransaction} className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black shadow-lg uppercase tracking-wider">Selesaikan & Simpan</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        // 3. E-PRESCRIPTION QUEUE (Dengan Skrining Standar, Penolakan & Supabase Sync)
+        function EPrescriptionQueueView({ ePrescriptions, setEPrescriptions, setActiveTab, setActivePrescriptionForPOS }) {
+            const [screeningData, setScreeningData] = useState({});
+            
+            const [rejectModalOpen, setRejectModalOpen] = useState(false);
+            const [selectedPres, setSelectedPres] = useState(null);
+            const [rejectReason, setRejectReason] = useState('Dosis obat tidak sesuai / melebihi batas maksimal');
+
+            useEffect(() => {
+                async function fetchResepFromSupabase() {
+                    if (!supabaseClient) return;
+                    try {
+                        const { data, error } = await supabaseClient.from('e_prescriptions').select('*');
+                        if (error) throw error;
+                        if (data && data.length > 0) {
+                            const mappedRx = data.map(rx => ({
+                                id: rx.id || rx.kode_resep || 'RX-SUPABASE',
+                                rmId: rx.rm_id || 'RM-001',
+                                patientName: rx.patient_name || rx.nama_pasien || 'Pasien',
+                                doctorName: rx.doctor_name || rx.nama_dokter || 'Dokter',
+                                items: typeof rx.items === 'string' ? JSON.parse(rx.items) : (rx.items || []),
+                                status: rx.status || 'Pending Skrining',
+                                timestamp: rx.timestamp || new Date().toLocaleTimeString(),
+                                screeningNotes: rx.screening_notes || rx.screeningNotes || ''
+                            }));
+                            setEPrescriptions(mappedRx);
+                        }
+                    } catch (err) {
+                        console.error("Gagal memuat data e_prescriptions dari Supabase:", err.message);
+                    }
+                }
+                fetchResepFromSupabase();
+            }, []);
+
+            const handleCheckboxChange = (presId, category, field) => {
+                setScreeningData(prev => {
+                    const currentPresScreening = prev[presId] || {
+                        admin: { namaDokter: true, sip: true, tglResep: true, paraf: true },
+                        farmasetik: { bentukSediaan: true, dosis: true, stabilitas: true, kompatibilitas: true },
+                        klinis: { tepatDosis: true, tepatWaktu: true, kontraIndikasi: true, interaksi: true }
+                    };
+
+                    return {
+                        ...prev,
+                        [presId]: {
+                            ...currentPresScreening,
+                            [category]: {
+                                ...currentPresScreening[category],
+                                [field]: !currentPresScreening[category][field]
+                            }
+                        }
+                    };
+                });
+            };
+
+            const handleApprovePrescription = async (rx) => {
+                const updatedStatus = 'Selesai / Terkirim ke POS';
+                const notes = 'Lolos Skrining Administratif, Farmasetik & Klinis';
+
+                const updatedList = ePrescriptions.map(item => {
+                    if (item.id === rx.id) {
+                        return { ...item, status: updatedStatus, screeningNotes: notes };
+                    }
+                    return item;
+                });
+
+                setEPrescriptions(updatedList);
+
+                if (supabaseClient) {
+                    try {
+                        await supabaseClient.from('e_prescriptions').upsert([{
+                            id: rx.id,
+                            patient_name: rx.patientName,
+                            doctor_name: rx.doctorName,
+                            status: updatedStatus,
+                            screening_notes: notes,
+                            items: JSON.stringify(rx.items)
+                        }]);
+                    } catch (err) {
+                        console.error("Gagal memperbarui status resep ke Supabase:", err.message);
+                    }
+                }
+
+                setActivePrescriptionForPOS(rx);
+                setActiveTab('pos-kasir');
+            };
+
+            const handleOpenRejectModal = (rx) => {
+                setSelectedPres(rx);
+                setRejectModalOpen(true);
+            };
+
+            const handleConfirmReject = async () => {
+                if (!selectedPres) return;
+
+                const updatedStatus = 'Ditolak / Tidak Memenuhi Syarat';
+                const notes = `Ditolak: ${rejectReason}`;
+
+                const updatedList = ePrescriptions.map(item => {
+                    if (item.id === selectedPres.id) {
+                        return { ...item, status: updatedStatus, screeningNotes: notes };
+                    }
+                    return item;
+                });
+
+                setEPrescriptions(updatedList);
+
+                if (supabaseClient) {
+                    try {
+                        await supabaseClient.from('e_prescriptions').upsert([{
+                            id: selectedPres.id,
+                            patient_name: selectedPres.patientName,
+                            doctor_name: selectedPres.doctorName,
+                            status: updatedStatus,
+                            screening_notes: notes,
+                            items: JSON.stringify(selectedPres.items)
+                        }]);
+                    } catch (err) {
+                        console.error("Gagal memperbarui status penolakan resep ke Supabase:", err.message);
+                    }
+                }
+
+                setRejectModalOpen(false);
+                setSelectedPres(null);
+            };
+
+            return (
+                <div className="space-y-4 text-xs">
+                    <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex justify-between items-center">
+                        <div>
+                            <h3 className="font-black text-slate-800 text-sm">E-Prescription Queue & Skrining Standar (Supabase Sync)</h3>
+                            <p className="text-[10px] text-slate-500 mt-0.5">Antrian resep elektronik dokter lengkap dengan checklist administratif, farmasetik, dan klinis.</p>
+                        </div>
+                    </div>
+
+                    <div className="space-y-4">
+                        {ePrescriptions.map(rx => {
+                            const presScreening = screeningData[rx.id] || {
+                                admin: { namaDokter: true, sip: true, tglResep: true, paraf: true },
+                                farmasetik: { bentukSediaan: true, dosis: true, stabilitas: true, kompatibilitas: true },
+                                klinis: { tepatDosis: true, tepatWaktu: true, kontraIndikasi: true, interaksi: true }
+                            };
+
+                            return (
+                                <div key={rx.id} className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs space-y-3">
+                                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b pb-3 gap-2">
+                                        <div>
+                                            <span className="font-mono font-black text-indigo-700 text-sm">{rx.id}</span>
+                                            <span className="ml-2 text-slate-500 text-[11px]">Waktu Masuk: {rx.timestamp}</span>
+                                            <h4 className="font-bold text-slate-800 mt-0.5">Pasien: {rx.patientName} (RM: {rx.rmId}) | Dokter: {rx.doctorName}</h4>
+                                        </div>
+                                        <div>
+                                            <span className={`px-3 py-1 rounded-full font-black text-[10px] ${
+                                                rx.status === 'Pending Skrining' ? 'bg-amber-100 text-amber-800 animate-pulse' : 
+                                                rx.status.includes('Selesai') ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
+                                            }`}>
+                                                {rx.status}
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                        {/* 1. ADMINISTRATIF */}
+                                        <div className="p-3 bg-slate-50 border rounded-xl space-y-1.5">
+                                            <h5 className="font-black text-slate-700 text-[10px] uppercase border-b pb-1">1. Skrining Administratif</h5>
+                                            {Object.keys(presScreening.admin).map(field => (
+                                                <label key={field} className="flex items-center gap-2 cursor-pointer text-slate-700 font-medium">
+                                                    <input 
+                                                        type="checkbox" 
+                                                        checked={presScreening.admin[field]} 
+                                                        onChange={() => handleCheckboxChange(rx.id, 'admin', field)}
+                                                        className="w-3.5 h-3.5 text-indigo-600 rounded" 
+                                                    />
+                                                    <span className="capitalize">{field.replace(/([A-Z])/g, ' $1')}</span>
+                                                </label>
+                                            ))}
+                                        </div>
+
+                                        {/* 2. FARMASETIK */}
+                                        <div className="p-3 bg-slate-50 border rounded-xl space-y-1.5">
+                                            <h5 className="font-black text-slate-700 text-[10px] uppercase border-b pb-1">2. Skrining Farmasetik</h5>
+                                            {Object.keys(presScreening.farmasetik).map(field => (
+                                                <label key={field} className="flex items-center gap-2 cursor-pointer text-slate-700 font-medium">
+                                                    <input 
+                                                        type="checkbox" 
+                                                        checked={presScreening.farmasetik[field]} 
+                                                        onChange={() => handleCheckboxChange(rx.id, 'farmasetik', field)}
+                                                        className="w-3.5 h-3.5 text-indigo-600 rounded" 
+                                                    />
+                                                    <span className="capitalize">{field.replace(/([A-Z])/g, ' $1')}</span>
+                                                </label>
+                                            ))}
+                                        </div>
+
+                                        {/* 3. KLINIS */}
+                                        <div className="p-3 bg-slate-50 border rounded-xl space-y-1.5">
+                                            <h5 className="font-black text-slate-700 text-[10px] uppercase border-b pb-1">3. Skrining Klinis</h5>
+                                            {Object.keys(presScreening.klinis).map(field => (
+                                                <label key={field} className="flex items-center gap-2 cursor-pointer text-slate-700 font-medium">
+                                                    <input 
+                                                        type="checkbox" 
+                                                        checked={presScreening.klinis[field]} 
+                                                        onChange={() => handleCheckboxChange(rx.id, 'klinis', field)}
+                                                        className="w-3.5 h-3.5 text-indigo-600 rounded" 
+                                                    />
+                                                    <span className="capitalize">{field.replace(/([A-Z])/g, ' $1')}</span>
+                                                </label>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    <div className="p-3 bg-indigo-50/40 border border-indigo-100 rounded-xl">
+                                        <h5 className="font-bold text-slate-800 mb-1 text-[10px] uppercase text-indigo-700">Daftar Obat Resep:</h5>
+                                        <ul className="list-disc list-inside text-slate-700">
+                                            {rx.items.map((it, idx) => (
+                                                <li key={idx}><b>{it.name}</b> (Qty: {it.qty}) - Aturan Pakai: {it.dosage}</li>
+                                            ))}
+                                        </ul>
+                                        {rx.screeningNotes && (
+                                            <p className="mt-2 text-[11px] text-slate-600 italic"><b>Catatan:</b> {rx.screeningNotes}</p>
+                                        )}
+                                    </div>
+
+                                    {rx.status === 'Pending Skrining' ? (
+                                        <div className="flex justify-end gap-2 pt-2 border-t">
+                                            <button onClick={() => handleOpenRejectModal(rx)} className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl text-xs shadow-xs transition">
+                                                <i className="fa-solid fa-ban mr-1"></i> Tolak / Tidak Memenuhi Syarat
+                                            </button>
+                                            <button onClick={() => handleApprovePrescription(rx)} className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl text-xs shadow-xs transition">
+                                                <i className="fa-solid fa-check mr-1"></i> Lolos Skrining & Kirim ke POS Kasir
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <div className="text-right text-slate-400 font-bold italic pt-2 border-t">
+                                            Status: {rx.status}
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })}
+
+                        {ePrescriptions.length === 0 && (
+                            <div className="p-8 text-center bg-white rounded-2xl border text-slate-400 italic">
+                                Belum ada antrian resep elektronik yang masuk.
+                            </div>
+                        )}
+                    </div>
+
+                    {/* MODAL ALASAN PENOLAKAN RESEP */}
+                    {rejectModalOpen && (
+                        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+                            <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden border">
+                                <div className="px-6 py-4 bg-slate-900 text-white flex justify-between items-center">
+                                    <h3 className="font-black text-sm">Konfirmasi Penolakan Resep</h3>
+                                    <button onClick={() => setRejectModalOpen(false)} className="text-slate-400 hover:text-white"><i className="fa-solid fa-xmark text-lg"></i></button>
+                                </div>
+                                <div className="p-6 space-y-4 text-xs">
+                                    <p className="text-slate-600">Resep <b>{selectedPres?.id}</b> atas nama pasien <b>{selectedPres?.patientName}</b> akan ditolak dan dikembalikan/dicatat.</p>
+                                    <div>
+                                        <label className="block font-bold text-slate-700 mb-1">Alasan Penolakan / Tidak Memenuhi Syarat *</label>
+                                        <textarea 
+                                            rows="3"
+                                            value={rejectReason}
+                                            onChange={e => setRejectReason(e.target.value)}
+                                            className="w-full p-2.5 border rounded-xl font-medium bg-white outline-none focus:ring-2 focus:ring-rose-500"
+                                            placeholder="Masukkan alasan penolakan..."
+                                        ></textarea>
+                                    </div>
+                                    <div className="pt-3 flex justify-end gap-2 border-t">
+                                        <button type="button" onClick={() => setRejectModalOpen(false)} className="px-4 py-2.5 bg-slate-200 hover:bg-slate-300 rounded-xl font-bold">Batal</button>
+                                        <button type="button" onClick={handleConfirmReject} className="px-5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-black shadow-xs">
+                                            Konfirmasi Tolak Resep
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        // 3.1. RIWAYAT SKRINING RESEP VIEW
+        function ScreeningHistoryView({ completedPrescriptions, setCompletedPrescriptions }) {
+            const [searchQuery, setSearchQuery] = useState('');
+            const [editModalOpen, setEditModalOpen] = useState(false);
+            const [currentEditItem, setCurrentEditItem] = useState(null);
+
+            const filteredData = completedPrescriptions.filter(item => 
+                item.patientName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                item.doctorName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                item.id.toLowerCase().includes(searchQuery.toLowerCase())
+            );
+
+            const handleDelete = (id) => {
+                if (window.confirm(`Hapus riwayat skrining resep #${id}?`)) {
+                    setCompletedPrescriptions(completedPrescriptions.filter(item => item.id !== id));
+                }
+            };
+
+            const handleOpenEdit = (item) => {
+                setCurrentEditItem({ ...item });
+                setEditModalOpen(true);
+            };
+
+            const handleSaveEdit = (e) => {
+                e.preventDefault();
+                setCompletedPrescriptions(completedPrescriptions.map(item => 
+                    item.id === currentEditItem.id ? currentEditItem : item
+                ));
+                setEditModalOpen(false);
+                alert("Data riwayat skrining berhasil diperbarui.");
+            };
+
+            const handlePrint = (item) => {
+                const printWin = window.open('', '_blank');
+                const html = `
+                    <html>
+                    <head>
+                        <title>Cetak Lembar Skrining Resep - ${item.id}</title>
+                        <style>
+                            body { font-family: sans-serif; padding: 20px; font-size: 12px; color: #333; }
+                            h2, h3 { text-align: center; margin: 0; }
+                            .box { border: 1px solid #ccc; padding: 15px; margin-top: 15px; border-radius: 8px; }
+                            table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+                            th, td { border: 1px solid #ddd; padding: 6px; text-align: left; }
+                            th { background: #f4f4f4; }
+                        </style>
+                    </head>
+                    <body>
+                        <h2>Apotek Latisha Farma</h2>
+                        <h3>Lembar Validasi & Skrining Resep Dokter</h3>
+                        <p style="text-align:center; color:#666;">No. Resep: <b>${item.id}</b> | Tanggal: ${item.timestamp}</p>
+                        
+                        <div class="box">
+                            <p><b>Nama Pasien:</b> ${item.patientName}</p>
+                            <p><b>Dokter Peresep:</b> ${item.doctorName}</p>
+                            <p><b>Status Skrining:</b> ${item.status}</p>
+                            <p><b>Catatan / Validasi:</b> ${item.screeningNotes || 'Memenuhi syarat administratif, farmasetik, dan klinis.'}</p>
+                        </div>
+
+                        <h4>Daftar Obat (R/)</h4>
+                        <table>
+                            <thead>
+                                <tr><th>No</th><th>Nama Obat</th><th>Jumlah</th><th>Aturan Pakai</th></tr>
+                            </thead>
+                            <tbody>
+                                ${item.items.map((it, idx) => `<tr><td>${idx+1}</td><td>${it.name}</td><td>${it.qty}</td><td>${it.dosage || '-'}</td></tr>`).join('')}
+                            </tbody>
+                        </table>
+                    </body>
+                    </html>
+                `;
+                printWin.document.write(html);
+                printWin.document.close();
+                printWin.focus();
+                setTimeout(() => { printWin.print(); printWin.close(); }, 250);
+            };
+
+            return (
+                <div className="space-y-4 text-xs">
+                    <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex flex-col md:flex-row justify-between items-center gap-3">
+                        <div>
+                            <h3 className="font-black text-slate-800 text-sm">Riwayat Skrining & Validasi Resep</h3>
+                            <p className="text-[10px] text-slate-500 mt-0.5">Arsip resep dokter yang telah melalui proses skrining apoteker.</p>
+                        </div>
+                        <div className="relative w-full md:w-72">
+                            <i className="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400 text-[10px]"></i>
+                            <input 
+                                type="text" 
+                                value={searchQuery}
+                                onChange={e => setSearchQuery(e.target.value)}
+                                placeholder="Cari pasien, dokter, atau no resep..." 
+                                className="w-full pl-8 pr-3 py-1.5 border rounded-lg text-xs bg-slate-50 focus:bg-white font-medium"
+                            />
+                        </div>
+                    </div>
+
+                    <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+                        <table className="w-full text-left text-xs">
+                            <thead className="bg-slate-50 border-b font-bold uppercase text-[11px] text-slate-600">
+                                <tr>
+                                    <th className="p-3">No. Resep & Waktu</th>
+                                    <th className="p-3">Pasien & Dokter</th>
+                                    <th className="p-3">Daftar Obat</th>
+                                    <th className="p-3">Status Skrining</th>
+                                    <th className="p-3 text-center">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y">
+                                {filteredData.map(item => (
+                                    <tr key={item.id} className="hover:bg-slate-50">
+                                        <td className="p-3">
+                                            <span className="font-mono font-bold text-indigo-700 block">{item.id}</span>
+                                            <span className="text-[10px] text-slate-500">{item.timestamp}</span>
+                                        </td>
+                                        <td className="p-3">
+                                            <span className="font-bold text-slate-800 block">{item.patientName}</span>
+                                            <span className="text-[10px] text-slate-500">{item.doctorName}</span>
+                                        </td>
+                                        <td className="p-3">
+                                            <ul className="list-disc list-inside text-slate-700">
+                                                {item.items.map((it, i) => (<li key={i}>{it.name} ({it.qty}x)</li>))}
+                                            </ul>
+                                        </td>
+                                        <td className="p-3">
+                                            <span className="px-2.5 py-1 bg-emerald-100 text-emerald-800 rounded-full font-bold text-[10px]">
+                                                {item.status}
+                                            </span>
+                                        </td>
+                                        <td className="p-3 text-center space-x-1.5">
+                                            <button onClick={() => handlePrint(item)} className="px-2.5 py-1 bg-slate-800 hover:bg-slate-900 text-white rounded-lg font-bold text-[10px]" title="Cetak Lembar Skrining">
+                                                <i className="fa-solid fa-print"></i>
+                                            </button>
+                                            <button onClick={() => handleOpenEdit(item)} className="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded-lg font-bold text-[10px]" title="Edit">
+                                                <i className="fa-solid fa-pen-to-square"></i>
+                                            </button>
+                                            <button onClick={() => handleDelete(item.id)} className="px-2.5 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-lg font-bold text-[10px]" title="Hapus">
+                                                <i className="fa-solid fa-trash"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
+                                {filteredData.length === 0 && (
+                                    <tr>
+                                        <td colSpan="5" className="p-8 text-center text-slate-400 italic">Tidak ada data riwayat skrining resep yang ditemukan.</td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {/* MODAL EDIT RIWAYAT SKRINING */}
+                    {editModalOpen && currentEditItem && (
+                        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+                            <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden border">
+                                <div className="px-6 py-4 bg-slate-900 text-white flex justify-between items-center">
+                                    <h3 className="font-black text-sm">Edit Riwayat Skrining Resep ({currentEditItem.id})</h3>
+                                    <button onClick={() => setEditModalOpen(false)} className="text-slate-400 hover:text-white"><i className="fa-solid fa-xmark text-lg"></i></button>
+                                </div>
+                                <form onSubmit={handleSaveEdit} className="p-6 space-y-4 text-xs">
+                                    <div>
+                                        <label className="block font-bold text-slate-700 mb-1">Nama Pasien</label>
+                                        <input 
+                                            type="text" 
+                                            value={currentEditItem.patientName} 
+                                            onChange={e => setCurrentEditItem({...currentEditItem, patientName: e.target.value})} 
+                                            required 
+                                            className="w-full p-2 border rounded-xl font-bold bg-white" 
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block font-bold text-slate-700 mb-1">Dokter Peresep</label>
+                                        <input 
+                                            type="text" 
+                                            value={currentEditItem.doctorName} 
+                                            onChange={e => setCurrentEditItem({...currentEditItem, doctorName: e.target.value})} 
+                                            required 
+                                            className="w-full p-2 border rounded-xl font-bold bg-white" 
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block font-bold text-slate-700 mb-1">Catatan Skrining / Validasi</label>
+                                        <textarea 
+                                            value={currentEditItem.screeningNotes || ''} 
+                                            onChange={e => setCurrentEditItem({...currentEditItem, screeningNotes: e.target.value})} 
+                                            rows="3" 
+                                            className="w-full p-2 border rounded-xl font-medium bg-white"
+                                        ></textarea>
+                                    </div>
+                                    <div className="pt-3 flex justify-end gap-2 border-t">
+                                        <button type="button" onClick={() => setEditModalOpen(false)} className="px-4 py-2 bg-slate-200 rounded-xl font-bold">Batal</button>
+                                        <button type="submit" className="px-5 py-2 bg-indigo-600 text-white rounded-xl font-black">Simpan Perubahan</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        // 3.2. PEMBELIAN & FAKTUR PBF VIEW
+        function PurchaseInvoiceView({ purchaseInvoices, setPurchaseInvoices, medicines, setMedicines, addAuditLog }) {
+            const [searchQuery, setSearchQuery] = useState('');
+            const [isModalOpen, setIsModalOpen] = useState(false);
+            const [editId, setEditId] = useState(null);
+
+            const [suppliersList, setSuppliersList] = useState([]);
+            const [masterPriceList, setMasterPriceList] = useState(medicines || []);
+
+            useEffect(() => {
+                async function fetchPurchaseModuleData() {
+                    if (!supabaseClient) return;
+                    try {
+                        const { data: supData } = await supabaseClient.from('supplier').select('*');
+                        if (supData && supData.length > 0) {
+                            setSuppliersList(supData.map(s => ({
+                                id: s.id || Math.random().toString(),
+                                name: s.nama_supplier || s.supplier_nama || s.name || 'Supplier PBF'
+                            })));
+                        }
+
+                        const { data: priceData } = await supabaseClient.from('master_price').select('*');
+                        if (priceData && priceData.length > 0) {
+                            const mappedPrices = priceData.map(p => ({
+                                id: p.id || Math.random().toString(),
+                                name: p.nama_obat || p.name || 'Obat',
+                                satuanKecil: p.satuan_kecil || p.unit || 'Box',
+                                satuanBesar: p.satuan_besar || p.satuanBesar || '',
+                                hpp: Number(p.hpp || p.price) || 0,
+                                hargaBesar: Number(p.harga_besar || p.hargaBesar || p.hna_besar || 0) || 0,
+                                konversi: Number(p.konversi || p.isi || 1) || 1,
+                                stock: Number(p.stock || p.stok) || 0
+                            }));
+                            setMasterPriceList(mappedPrices);
+                        }
+
+                        const { data: invData } = await supabaseClient.from('purchase_invoices').select('*');
+                        if (invData && invData.length > 0) {
+                            setPurchaseInvoices(invData.map(inv => ({
+                                id: inv.id || 'INV-SUPABASE',
+                                pbfName: inv.pbf_name || '',
+                                invoiceNo: inv.invoice_no || '',
+                                date: inv.tanggal_faktur || inv.date || new Date().toISOString().split('T')[0],
+                                dueDate: inv.tanggal_tempo || inv.due_date || '',
+                                salesman: inv.salesman || '',
+                                term: inv.term || '30 Hari',
+                                usePpn: inv.use_ppn !== undefined ? inv.use_ppn : true,
+                                items: typeof inv.items === 'string' ? JSON.parse(inv.items) : (inv.items || []),
+                                dpp: Number(inv.dpp) || 0,
+                                grossDpp: Number(inv.gross_dpp) || 0,
+                                totalDiscountAmount: Number(inv.total_discount_amount) || 0,
+                                ppn: Number(inv.ppn) || 0,
+                                totalTagihan: Number(inv.total_tagihan) || 0,
+                                status: inv.status || 'Belum Lunas'
+                            })));
+                        }
+                    } catch (err) {
+                        console.error("Error loading purchase data:", err.message);
+                    }
+                }
+                fetchPurchaseModuleData();
+            }, []);
+
+            const [form, setForm] = useState({
+                pbfName: '',
+                invoiceNo: '',
+                date: new Date().toISOString().split('T')[0],
+                dueDate: '',
+                salesman: '',
+                term: '30 Hari',
+                totalDiscountPercent: 0,
+                usePpn: true,
+                items: []
+            });
+
+            const calculateDueDate = (invoiceDate, termVal) => {
+                if (!invoiceDate) return '';
+                const dateObj = new Date(invoiceDate);
+                let daysToAdd = 30;
+                if (termVal === 'Cash / COD') daysToAdd = 0;
+                else if (termVal === '14 Hari') daysToAdd = 14;
+                else if (termVal === '30 Hari') daysToAdd = 30;
+                else if (termVal === '60 Hari') daysToAdd = 60;
+                dateObj.setDate(dateObj.getDate() + daysToAdd);
+                return dateObj.toISOString().split('T')[0];
+            };
+
+            const handleDateChange = (newDate) => {
+                setForm(prev => ({ ...prev, date: newDate, dueDate: calculateDueDate(newDate, prev.term) }));
+            };
+
+            const handleTermChange = (newTerm) => {
+                setForm(prev => ({ ...prev, term: newTerm, dueDate: calculateDueDate(prev.date, newTerm) }));
+            };
+
+            const [currentItem, setCurrentItem] = useState({
+                medId: '',
+                name: '',
+                qty: 1,
+                unit: '',
+                batchNo: '',
+                expDate: '',
+                price: 0,
+                disc: 0
+            });
+
+            const [showSupplierDropdown, setShowSupplierDropdown] = useState(false);
+            const [showMedicineDropdown, setShowMedicineDropdown] = useState(false);
+
+            const filteredInvoices = (purchaseInvoices || []).filter(inv =>
+                (inv.pbfName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+                (inv.invoiceNo || '').toLowerCase().includes(searchQuery.toLowerCase())
+            );
+
+            const filteredSuppliers = suppliersList.filter(s =>
+                s.name.toLowerCase().includes((form.pbfName || '').toLowerCase())
+            );
+
+            const filteredMasterPrices = masterPriceList.filter(m =>
+                m.name.toLowerCase().includes(currentItem.name.toLowerCase())
+            );
+
+            const handleOpenAdd = () => {
+                setEditId(null);
+                const today = new Date().toISOString().split('T')[0];
+                setForm({
+                    pbfName: '',
+                    invoiceNo: '',
+                    date: today,
+                    dueDate: calculateDueDate(today, '30 Hari'),
+                    salesman: '',
+                    term: '30 Hari',
+                    totalDiscountPercent: 0,
+                    usePpn: true,
+                    items: []
+                });
+                setCurrentItem({ medId: '', name: '', qty: 1, unit: '', batchNo: '', expDate: '', price: 0, disc: 0 });
+                setIsModalOpen(true);
+            };
+
+            const handleOpenEdit = (inv) => {
+                setEditId(inv.id);
+                setForm({ 
+                    ...inv, 
+                    totalDiscountPercent: inv.totalDiscountPercent || 0,
+                    usePpn: inv.usePpn !== undefined ? inv.usePpn : true 
+                });
+                setIsModalOpen(true);
+            };
+
+            const handleDelete = async (id) => {
+                if (window.confirm(`Hapus data faktur pembelian #${id}?`)) {
+                    setPurchaseInvoices(prev => prev.filter(inv => inv.id !== id));
+                    if (addAuditLog) addAuditLog('Pembelian', `Menghapus faktur pembelian #${id}`);
+                    if (supabaseClient) {
+                        await supabaseClient.from('purchase_invoices').delete().eq('id', id);
+                    }
+                }
+            };
+
+            const handleAddItemToInvoice = () => {
+                if (!currentItem.name || !currentItem.medId) {
+                    alert("Pilih obat terlebih dahulu dari Master Price!");
+                    return;
+                }
+                const qtyNum = Number(currentItem.qty) || 1;
+                const priceNum = Number(currentItem.price) || 0;
+                const discNum = Number(currentItem.disc) || 0;
+                const subtotal = (qtyNum * priceNum) - ((qtyNum * priceNum * discNum) / 100);
+                
+                setForm(prev => ({
+                    ...prev,
+                    items: [...prev.items, { ...currentItem, qty: qtyNum, price: priceNum, disc: discNum, subtotal: Math.round(subtotal) }]
+                }));
+                setCurrentItem({ medId: '', name: '', qty: 1, unit: '', batchNo: '', expDate: '', price: 0, disc: 0 });
+            };
+
+            const handleRemoveItem = (index) => {
+                setForm(prev => ({ ...prev, items: prev.items.filter((_, idx) => idx !== index) }));
+            };
+
+            const grossDpp = form.items.reduce((acc, it) => acc + (Number(it.subtotal) || 0), 0);
+            const totalDiscountAmount = Math.round(grossDpp * ((Number(form.totalDiscountPercent) || 0) / 100));
+            const netDpp = grossDpp - totalDiscountAmount;
+            const ppnTotal = form.usePpn ? Math.round(netDpp * 0.11) : 0;
+            const grandTotalTagihan = netDpp + ppnTotal;
+
+            const handleSaveInvoice = async (e) => {
+                e.preventDefault();
+                if (form.items.length === 0) {
+                    alert("Faktur minimal harus memiliki 1 item obat!");
+                    return;
+                }
+
+                const newInvoiceRecord = {
+                    id: editId || `INV-PBF-${Date.now().toString().slice(-6)}`,
+                    ...form,
+                    dpp: netDpp,
+                    grossDpp: grossDpp,
+                    totalDiscountAmount: totalDiscountAmount,
+                    ppn: ppnTotal,
+                    totalTagihan: grandTotalTagihan,
+                    status: 'Belum Lunas'
+                };
+
+                if (editId) {
+                    setPurchaseInvoices(prev => prev.map(inv => inv.id === editId ? newInvoiceRecord : inv));
+                    if (addAuditLog) addAuditLog('Pembelian', `Memperbarui faktur PBF: ${newInvoiceRecord.invoiceNo}`);
+                } else {
+                    setPurchaseInvoices(prev => [newInvoiceRecord, ...prev]);
+                    if (addAuditLog) addAuditLog('Pembelian', `Menambahkan faktur PBF baru: ${newInvoiceRecord.invoiceNo}`);
+                }
+
+                if (supabaseClient) {
+                    try {
+                        await supabaseClient.from('purchase_invoices').upsert([{
+                            id: newInvoiceRecord.id,
+                            pbf_name: newInvoiceRecord.pbfName,
+                            invoice_no: newInvoiceRecord.invoiceNo,
+                            tanggal_faktur: newInvoiceRecord.date,
+                            tanggal_tempo: newInvoiceRecord.dueDate,
+                            salesman: newInvoiceRecord.salesman,
+                            term: newInvoiceRecord.term,
+                            use_ppn: newInvoiceRecord.usePpn,
+                            items: JSON.stringify(newInvoiceRecord.items),
+                            dpp: newInvoiceRecord.dpp,
+                            gross_dpp: newInvoiceRecord.grossDpp,
+                            total_discount_amount: newInvoiceRecord.totalDiscountAmount,
+                            ppn: newInvoiceRecord.ppn,
+                            total_tagihan: newInvoiceRecord.totalTagihan,
+                            status: newInvoiceRecord.status
+                        }]);
+                    } catch (err) {
+                        console.error("Gagal simpan ke Supabase:", err.message);
+                    }
+                }
+
+                setIsModalOpen(false);
+            };
+
+            return (
+                <div className="space-y-4 text-xs">
+                    <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex flex-col md:flex-row justify-between items-center gap-3">
+                        <div>
+                            <h3 className="font-black text-slate-800 text-sm">Pembelian & Penerimaan Faktur PBF</h3>
+                            <p className="text-[10px] text-slate-500 mt-0.5">Kelola faktur pembelian dari supplier Supabase.</p>
+                        </div>
+                        <div className="flex items-center gap-2 w-full md:w-auto">
+                            <div className="relative flex-1 md:w-64">
+                                <i className="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400 text-[10px]"></i>
+                                <input 
+                                    type="text" 
+                                    value={searchQuery}
+                                    onChange={e => setSearchQuery(e.target.value)}
+                                    placeholder="Cari faktur..." 
+                                    className="w-full pl-8 pr-3 py-1.5 border rounded-lg text-xs bg-slate-50 focus:bg-white font-medium"
+                                />
+                            </div>
+                            <button onClick={handleOpenAdd} className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl text-xs shadow-xs transition flex items-center gap-1.5">
+                                <i className="fa-solid fa-plus"></i> + Faktur Pembelian
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+                        <table className="w-full text-left text-xs">
+                            <thead className="bg-slate-50 border-b font-bold uppercase text-[11px] text-slate-600">
+                                <tr>
+                                    <th className="p-3">No. Faktur & PBF</th>
+                                    <th className="p-3">Tanggal & Tempo</th>
+                                    <th className="p-3 text-center">Jumlah Item</th>
+                                    <th className="p-3 text-right">Total Tagihan (PPN)</th>
+                                    <th className="p-3 text-center">Status</th>
+                                    <th className="p-3 text-center">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y">
+                                {filteredInvoices.map(inv => (
+                                    <tr key={inv.id} className="hover:bg-slate-50">
+                                        <td className="p-3">
+                                            <span className="font-mono font-bold text-indigo-700 block">{inv.invoiceNo}</span>
+                                            <span className="text-[10px] font-bold text-slate-700">{inv.pbfName}</span>
+                                        </td>
+                                        <td className="p-3">
+                                            <span className="block text-slate-800">Tgl: {inv.date}</span>
+                                            <span className="text-[10px] text-rose-600 font-bold">Tempo: {inv.dueDate}</span>
+                                        </td>
+                                        <td className="p-3 text-center">
+                                            <span className="px-2.5 py-1 bg-indigo-50 text-indigo-700 font-black rounded-lg text-xs">
+                                                {inv.items.length} Item
+                                            </span>
+                                        </td>
+                                        <td className="p-3 text-right font-mono font-bold text-slate-900">
+                                            Rp {inv.totalTagihan.toLocaleString()}
+                                            <span className="block text-[9px] text-slate-500 font-normal">{inv.usePpn ? '+PPN 11%' : 'Termasuk PPN'}</span>
+                                        </td>
+                                        <td className="p-3 text-center">
+                                            <span className={`px-2.5 py-1 rounded-full font-bold text-[10px] ${inv.status === 'Lunas' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
+                                                {inv.status}
+                                            </span>
+                                        </td>
+                                        <td className="p-3 text-center space-x-1.5">
+                                            <button onClick={() => handleOpenEdit(inv)} className="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded-lg font-bold text-[10px]" title="Edit">
+                                                <i className="fa-solid fa-pen-to-square"></i>
+                                            </button>
+                                            <button onClick={() => handleDelete(inv.id)} className="px-2.5 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-lg font-bold text-[10px]" title="Hapus">
+                                                <i className="fa-solid fa-trash"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            );
+        }
+
+        // 4. INVENTORY VIEW (Master Price List & Batch FEFO)
+        function InventoryView({ medicines, setMedicines, unitsList, addAuditLog }) { 
+            const [isModalOpen, setIsModalOpen] = useState(false);
+            const [editId, setEditId] = useState(null);
+            const [searchQuery, setSearchQuery] = useState('');
+            const [showTieredPricing, setShowTieredPricing] = useState(false);
+
+            const [form, setForm] = useState({
+                name: '',
+                category: 'Obat Bebas',
+                satuanBesar: 'Box',
+                satuanKecil: 'Strip',
+                rasioKonversi: 10,
+                hnaBesar: 50000,
+                markupPercent: 100,
+                minStock: 10,
+                maxStock: 100,
+                batchNo: '',
+                stock: 50,
+                expDate: '2028-01-01',
+                supplier: 'PT Kimia Farma Trading',
+                tieredConfig: {
+                    terkecil: {
+                        pasien: { active: false, markup: 90 },
+                        mitra: { active: false, markup: 80 }
+                    },
+                    besar: {
+                        pasien: { active: false, markup: 90 },
+                        mitra: { active: false, markup: 80 }
+                    }
+                }
+            });
+
+            useEffect(() => {
+                let isMounted = true;
+                async function fetchSupabaseMasterPrice() {
+                    if (!supabaseClient) return;
+                    try {
+                        const { data, error } = await supabaseClient.from('master_price').select('*');
+                        if (error) throw error;
+                        if (data && data.length > 0 && isMounted) {
+                            const mapped = data.map(item => ({
+                                id: item.id || Date.now(),
+                                name: item.nama_obat || 'Tanpa Nama',
+                                unit: item.satuan || 'Strip',
+                                satuanBesar: item.satuan_besar || 'Box',
+                                satuanKecil: item.satuan || 'Strip',
+                                rasioKonversi: Number(item.rasio_konversi || item.konversi) || 10,
+                                hnaBesar: Number(item.hna) || 0,
+                                hpp: Number(item.hpp) || 0,
+                                sellPrice: Number(item.sales_price) || 0,
+                                sellPriceKlinik: Number(item.harga_klinik || item.sellPriceKlinik) || Math.round((Number(item.sales_price) || 0) * 0.95),
+                                sellPriceMitra: Number(item.harga_mitra || item.sellPriceMitra) || Math.round((Number(item.sales_price) || 0) * 0.90),
+                                stock: Number(item.stok) || 0,
+                                minStock: 10,
+                                maxStock: 100,
+                                batchNo: item.batch_no || 'BTC-SYNC',
+                                expDate: item.exp_date || '2028-01-01',
+                                isTieredActive: item.is_tiered_active || false,
+                                tieredConfig: item.tiered_config ? (typeof item.tiered_config === 'string' ? JSON.parse(item.tiered_config) : item.tiered_config) : {
+                                    terkecil: { pasien: { active: false, markup: 90 }, mitra: { active: false, markup: 80 } },
+                                    besar: { pasien: { active: false, markup: 90 }, mitra: { active: false, markup: 80 } }
+                                }
+                            }));
+                            setMedicines(mapped);
+                        }
+                    } catch (err) {
+                        console.error("Gagal memuat master_price dari Supabase:", err.message);
+                    }
+                }
+                fetchSupabaseMasterPrice();
+                return () => { isMounted = false; };
+            }, []);
+
+            const parseNum = (val) => {
+                if (val === '' || val === null || val === undefined) return 0;
+                const n = Number(val);
+                return isNaN(n) ? 0 : n;
+            };
+
+            const hnaBesarVal = parseNum(form.hnaBesar);
+            const markupDasarVal = parseNum(form.markupPercent);
+            const rasioVal = parseNum(form.rasioKonversi) || 1;
+
+            const hppBesar = Math.round(hnaBesarVal * 1.11);
+            const salesPriceBesar = Math.round(hppBesar + (hppBesar * (markupDasarVal / 100)));
+            
+            const hnaKecil = rasioVal > 0 ? hnaBesarVal / rasioVal : hnaBesarVal;
+            const hppKecil = Math.round(hnaKecil * 1.11);
+            const salesPriceKecil = rasioVal > 0 ? Math.round(salesPriceBesar / rasioVal) : salesPriceBesar;
+
+            const markupMitraKecil = form.tieredConfig?.terkecil?.mitra?.active ? parseNum(form.tieredConfig.terkecil.mitra.markup) : markupDasarVal;
+            const sellPriceMitraKecil = Math.round(hppKecil + (hppKecil * (markupMitraKecil / 100)));
+
+            const handleOpenAdd = () => {
+                setEditId(null);
+                setShowTieredPricing(false);
+                setForm({
+                    name: '',
+                    category: 'Obat Bebas',
+                    satuanBesar: 'Box',
+                    satuanKecil: 'Strip',
+                    rasioKonversi: 10,
+                    hnaBesar: 50000,
+                    markupPercent: 100,
+                    minStock: 10,
+                    maxStock: 100,
+                    batchNo: `BTC-${new Date().getFullYear()}A`,
+                    stock: 50,
+                    expDate: '2028-01-01',
+                    supplier: 'PT Kimia Farma Trading',
+                    tieredConfig: {
+                        terkecil: { pasien: { active: false, markup: 90 }, mitra: { active: false, markup: 80 } },
+                        besar: { pasien: { active: false, markup: 90 }, mitra: { active: false, markup: 80 } }
+                    }
+                });
+                setIsModalOpen(true);
+            };
+
+            const handleOpenEdit = (m) => {
+                setEditId(m.id);
+                setShowTieredPricing(m.isTieredActive || false);
+                setForm({
+                    name: m.name || '',
+                    category: m.category || 'Obat Bebas',
+                    satuanBesar: m.satuanBesar || 'Box',
+                    satuanKecil: m.satuanKecil || m.unit || 'Strip',
+                    rasioKonversi: m.rasioKonversi || 10,
+                    hnaBesar: m.hnaBesar || 50000,
+                    markupPercent: m.markupPercent || 100,
+                    minStock: m.minStock || 10,
+                    maxStock: m.maxStock || 100,
+                    batchNo: m.batchNo || 'BTC-001',
+                    stock: m.stock || 0,
+                    expDate: m.expDate || '2028-01-01',
+                    supplier: m.supplier || 'PT Kimia Farma Trading',
+                    tieredConfig: m.tieredConfig || {
+                        terkecil: { pasien: { active: false, markup: 90 }, mitra: { active: false, markup: 80 } },
+                        besar: { pasien: { active: false, markup: 90 }, mitra: { active: false, markup: 80 } }
+                    }
+                });
+                setIsModalOpen(true);
+            };
+
+            const handleDelete = async (id, name) => {
+                if (window.confirm(`Apakah Anda yakin ingin menghapus obat "${name}"?`)) {
+                    setMedicines(Array.isArray(medicines) ? medicines.filter(m => m.id !== id) : []);
+                    if (addAuditLog) addAuditLog('Inventori', `Menghapus obat: ${name}`);
+
+                    if (supabaseClient) {
+                        await supabaseClient.from('master_price').delete().eq('id', id);
+                    }
+                }
+            };
+
+            const handleSave = async (e) => {
+                e.preventDefault();
+
+                const recordId = editId ? editId : `MED-${Date.now()}`;
+
+                const payload = {
+                    id: recordId,
+                    name: form.name,
+                    category: form.category,
+                    unit: form.satuanKecil,
+                    satuanBesar: form.satuanBesar,
+                    satuanKecil: form.satuanKecil,
+                    rasioKonversi: rasioVal,
+                    hnaBesar: hnaBesarVal,
+                    markupPercent: markupDasarVal,
+                    hpp: hppBesar,
+                    sellPrice: salesPriceKecil,
+                    sellPriceKlinik: Math.round(salesPriceKecil * 0.95),
+                    sellPriceMitra: sellPriceMitraKecil,
+                    stock: parseNum(form.stock),
+                    minStock: parseNum(form.minStock),
+                    batchNo: form.batchNo || '',
+                    expDate: form.expDate || null,
+                    isTieredActive: showTieredPricing,
+                    tieredConfig: form.tieredConfig
+                };
+
+                if (supabaseClient) {
+                    try {
+                        const dbRecord = {
+                            id: recordId,
+                            nama_obat: payload.name,
+                            satuan: payload.satuanKecil,
+                            satuan_besar: payload.satuanBesar,
+                            rasio_konversi: payload.rasioKonversi,
+                            hna: payload.hnaBesar,
+                            hpp: payload.hpp,
+                            sales_price: payload.sellPrice,
+                            harga_klinik: payload.sellPriceKlinik,
+                            harga_mitra: payload.sellPriceMitra,
+                            stok: payload.stock,
+                            is_tiered_active: payload.isTieredActive,
+                            tiered_config: JSON.stringify(payload.tieredConfig)
+                        };
+
+                        const { error } = await supabaseClient
+                            .from('master_price')
+                            .upsert([dbRecord], { onConflict: ['id'] });
+
+                        if (error) {
+                            console.error("Gagal simpan ke Supabase:", error.message);
+                            alert("GAGAL MENYIMPAN KE SUPABASE: " + error.message);
+                            return; 
+                        }
+                    } catch (err) {
+                        console.error("Error Koneksi Supabase:", err.message);
+                        alert("Terjadi kesalahan koneksi ke Supabase: " + err.message);
+                        return;
+                    }
+                }
+
+                let updatedList = [];
+                if (editId) {
+                    updatedList = medicines.map(item => item.id === editId ? { ...payload, id: editId } : item);
+                } else {
+                    updatedList = [payload, ...medicines];
+                }
+                
+                if (setMedicines) setMedicines(updatedList);
+                setIsModalOpen(false);
+            };
+
+            const filteredMedicines = medicines.filter(m => 
+                (m?.name || '').toLowerCase().includes((searchQuery || '').toLowerCase()) ||
+                ((m?.category || '').toLowerCase().includes((searchQuery || '').toLowerCase()))
+            );
+
+            return (
+                <div className="space-y-3 text-xs">
+                    <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-xs flex flex-col md:flex-row justify-between items-center gap-3">
+                        <div>
+                            <h3 className="font-black text-slate-800 text-sm">Master Price List & Batch (FEFO - Supabase Sync)</h3>
+                            <p className="text-[10px] text-slate-500 mt-0.5">Pengaturan harga dasar, harga khusus mitra/klinik, dan integrasi stok Supabase.</p>
+                        </div>
+                        <div className="flex items-center gap-2 w-full md:w-auto">
+                            <div className="relative flex-1 md:w-60">
+                                <i className="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400 text-[10px]"></i>
+                                <input 
+                                    type="text" 
+                                    value={searchQuery}
+                                    onChange={e => setSearchQuery(e.target.value)}
+                                    placeholder="Cari nama obat..." 
+                                    className="w-full pl-8 pr-3 py-1.5 border rounded-xl text-xs bg-slate-50 focus:bg-white font-medium outline-none"
+                                />
+                            </div>
+                            <button onClick={handleOpenAdd} className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-xl text-xs shadow-md transition flex items-center gap-1.5">
+                                <i className="fa-solid fa-plus"></i> Tambah Obat
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+                        <table className="w-full text-left text-[11px]">
+                            <thead className="bg-slate-50 border-b font-bold uppercase text-[10px] text-slate-600">
+                                <tr>
+                                    <th className="p-3">Nama Obat</th>
+                                    <th className="p-3">Satuan</th>
+                                    <th className="p-3 text-center">Konversi</th>
+                                    <th className="p-3 text-right">HNA</th>
+                                    <th className="p-3 text-right">HPP</th>
+                                    <th className="p-3 text-right">Harga Reguler</th>
+                                    <th className="p-3 text-right text-emerald-700">Harga Mitra</th>
+                                    <th className="p-3 text-center">Stok</th>
+                                    <th className="p-3 text-center">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y">
+                                {filteredMedicines.map(m => (
+                                    <tr key={m.id} className="hover:bg-slate-50 transition">
+                                        <td className="p-3 font-bold text-slate-800">{m.name}</td>
+                                        <td className="p-3">{m.satuanBesar || 'Box'} / {m.satuanKecil || m.unit}</td>
+                                        <td className="p-3 text-center font-mono font-bold text-indigo-700">
+                                            1 : {m.rasioKonversi || 10}
+                                        </td>
+                                        <td className="p-3 text-right font-mono text-slate-600">Rp {(m.hnaBesar || 0).toLocaleString()}</td>
+                                        <td className="p-3 text-right font-mono font-bold text-amber-700">Rp {(m.hpp || 0).toLocaleString()}</td>
+                                        <td className="p-3 text-right font-mono font-bold text-indigo-700">Rp {(m.sellPrice || 0).toLocaleString()}</td>
+                                        <td className="p-3 text-right font-mono font-bold text-emerald-700">Rp {(m.sellPriceMitra || m.sellPrice || 0).toLocaleString()}</td>
+                                        <td className="p-3 text-center font-black text-emerald-700">{m.stock} {m.unit}</td>
+                                        <td className="p-3 text-center space-x-1.5">
+                                            <button onClick={() => handleOpenEdit(m)} className="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded-lg font-bold text-[10px]" title="Edit">
+                                                <i className="fa-solid fa-pen-to-square"></i>
+                                            </button>
+                                            <button onClick={() => handleDelete(m.id, m.name)} className="px-2.5 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-lg font-bold text-[10px]" title="Hapus">
+                                                <i className="fa-solid fa-trash"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {/* MODAL FORM EDIT / TAMBAH OBAT */}
+                    {isModalOpen && (
+                        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center z-50 p-4 overflow-y-auto">
+                            <div className="bg-white rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden border my-6">
+                                <div className="px-6 py-4 bg-slate-900 text-white flex justify-between items-center sticky top-0 z-10">
+                                    <h3 className="font-black text-xs uppercase tracking-wider">{editId ? 'Edit Master Data Obat' : 'Tambah Obat Baru'}</h3>
+                                    <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-white"><i className="fa-solid fa-xmark text-sm"></i></button>
+                                </div>
+
+                                <form onSubmit={handleSave} className="p-6 space-y-4 text-[11px] max-h-[80vh] overflow-y-auto custom-scrollbar">
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <label className="block font-bold mb-1 text-slate-700">Nama Obat *</label>
+                                            <input type="text" value={form.name} onChange={e => setForm({...form, name: e.target.value})} required className="w-full p-2 border rounded-xl font-bold bg-white" placeholder="Contoh: Paracetamol 500mg" />
+                                        </div>
+                                        <div>
+                                            <label className="block font-bold mb-1 text-slate-700">Kategori / Golongan *</label>
+                                            <select value={form.category} onChange={e => setForm({...form, category: e.target.value})} className="w-full p-2 border rounded-xl font-bold bg-white">
+                                                <option value="Obat Bebas">Obat Bebas</option>
+                                                <option value="Obat Bebas Terbatas">Obat Bebas Terbatas</option>
+                                                <option value="Obat Keras">Obat Keras</option>
+                                                <option value="Alat Kesehatan">Alat Kesehatan</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <div className="p-3.5 border rounded-2xl bg-white shadow-xs space-y-2">
+                                        <h4 className="font-black text-slate-800 uppercase tracking-wider text-[10px]">Aturan Satuan & Konversi</h4>
+                                        <div className="grid grid-cols-3 gap-2">
+                                            <div>
+                                                <label className="block font-bold text-slate-600 mb-0.5">Satuan Besar</label>
+                                                <input type="text" value={form.satuanBesar} onChange={e => setForm({...form, satuanBesar: e.target.value})} className="w-full p-2 border rounded-xl font-bold bg-white" />
+                                            </div>
+                                            <div>
+                                                <label className="block font-bold text-slate-600 mb-0.5">Satuan Kecil</label>
+                                                <input type="text" value={form.satuanKecil} onChange={e => setForm({...form, satuanKecil: e.target.value})} className="w-full p-2 border rounded-xl font-bold bg-white" />
+                                            </div>
+                                            <div>
+                                                <label className="block font-bold text-slate-600 mb-0.5">Rasio Konversi</label>
+                                                <input type="number" value={form.rasioKonversi} onChange={e => setForm({...form, rasioKonversi: e.target.value})} className="w-full p-2 border rounded-xl font-bold bg-white text-indigo-700" />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="p-3.5 border rounded-2xl bg-slate-50 space-y-2">
+                                        <h4 className="font-black text-slate-800 uppercase tracking-wider text-[10px]">Pengaturan Harga Dasar & Skema Mitra</h4>
+                                        <div className="grid grid-cols-4 gap-2">
+                                            <div>
+                                                <label className="block font-bold text-slate-600 mb-0.5">HNA ({form.satuanBesar})</label>
+                                                <input type="number" value={form.hnaBesar} onChange={e => setForm({...form, hnaBesar: e.target.value})} className="w-full p-2 border rounded-xl font-bold bg-white text-indigo-700" />
+                                            </div>
+                                            <div>
+                                                <label className="block font-bold text-slate-600 mb-0.5">HPP (+11%)</label>
+                                                <input type="text" readOnly value={`Rp ${hppBesar.toLocaleString()}`} className="w-full p-2 border rounded-xl font-bold bg-slate-200 text-amber-700" />
+                                            </div>
+                                            <div>
+                                                <label className="block font-bold text-slate-600 mb-0.5">Jual Reguler</label>
+                                                <input type="text" readOnly value={`Rp ${salesPriceKecil.toLocaleString()}`} className="w-full p-2 border rounded-xl font-black bg-indigo-50 text-indigo-900" />
+                                            </div>
+                                            <div>
+                                                <label className="block font-bold text-slate-600 mb-0.5">Harga Mitra (Khusus)</label>
+                                                <input type="text" readOnly value={`Rp ${sellPriceMitraKecil.toLocaleString()}`} className="w-full p-2 border rounded-xl font-black bg-emerald-50 text-emerald-800" />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="p-3.5 border rounded-2xl bg-slate-50 space-y-2">
+                                        <h4 className="font-extrabold text-slate-800 border-b pb-1 text-[10px]">Informasi Stok & Batch FEFO</h4>
+                                        <div className="grid grid-cols-3 gap-2">
+                                            <div>
+                                                <label className="block font-bold text-slate-600 mb-0.5">Stok Awal *</label>
+                                                <input type="number" value={form.stock} onChange={e => setForm({...form, stock: e.target.value})} required className="w-full p-2 border rounded-xl font-bold bg-white" />
+                                            </div>
+                                            <div>
+                                                <label className="block font-bold text-slate-600 mb-0.5">No. Batch *</label>
+                                                <input type="text" value={form.batchNo} onChange={e => setForm({...form, batchNo: e.target.value})} required className="w-full p-2 border rounded-xl font-bold bg-white" />
+                                            </div>
+                                            <div>
+                                                <label className="block font-bold text-slate-600 mb-0.5">Expired Date *</label>
+                                                <input type="date" value={form.expDate} onChange={e => setForm({...form, expDate: e.target.value})} required className="w-full p-2 border rounded-xl font-bold bg-white" />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="pt-3 flex justify-end gap-2 border-t sticky bottom-0 bg-white py-2">
+                                        <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 bg-slate-200 hover:bg-slate-300 rounded-xl font-bold">Batal</button>
+                                        <button type="submit" className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-black shadow-md">Simpan Data Obat</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        // 5. STOCK CARD VIEW
+        function StockCardView({ medicines, stockMutations }) {
+            const [selectedMedId, setSelectedMedId] = useState(medicines[0]?.id || '');
+            const [startDate, setStartDate] = useState('');
+            const [endDate, setEndDate] = useState('');
+
+            const selectedMedicine = medicines.find(m => m.id === selectedMedId) || medicines[0];
+
+            const filteredMutations = useMemo(() => {
+                return stockMutations.filter(m => {
+                    if (m.medicineId !== selectedMedId) return false;
+                    if (startDate && m.date < startDate) return false;
+                    if (endDate && m.date > endDate) return false;
+                    return true;
+                });
+            }, [stockMutations, selectedMedId, startDate, endDate]);
+
+            return (
+                <div className="space-y-4">
+                    <div className="flex flex-wrap justify-between items-center bg-white p-4 rounded-2xl border border-slate-200 shadow-xs gap-3 no-print">
+                        <h3 className="font-black text-slate-800 text-sm">Kartu Stok Resmi Obat</h3>
+                        
+                        <div className="flex flex-wrap items-center gap-3 text-xs font-bold">
+                            <div>
+                                <label className="block text-[10px] text-slate-500 uppercase">Pilih Obat</label>
+                                <select 
+                                    value={selectedMedId} 
+                                    onChange={e => setSelectedMedId(e.target.value)} 
+                                    className="p-2 border rounded-xl bg-white text-slate-800"
+                                >
+                                    {medicines.map(m => (<option key={m.id} value={m.id}>{m.name}</option>))}
+                                </select>
+                            </div>
+
+                            <button onClick={() => window.print()} className="mt-4 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-md transition flex items-center gap-2">
+                                <i className="fa-solid fa-print"></i> Cetak Kartu Stok
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="printable-modal" className="bg-white p-6 rounded-2xl border shadow-xs space-y-4">
+                        <div className="text-center border-b pb-4">
+                            <h2 className="font-black text-lg text-slate-900 uppercase">Apotek Latisha Farma</h2>
+                            <h4 className="font-bold text-sm text-slate-700 uppercase">Kartu Stok Obat</h4>
+                            <p className="text-xs text-slate-500 font-semibold mt-1">
+                                Nama Obat: <strong className="text-slate-800">{selectedMedicine?.name}</strong> | Batch: <strong className="text-slate-800">{selectedMedicine?.batchNo}</strong>
+                            </p>
+                        </div>
+
+                        <table className="w-full text-left text-xs border border-collapse">
+                            <thead className="bg-slate-100 border-b font-bold uppercase text-[11px]">
+                                <tr>
+                                    <th className="p-2 border">Tanggal</th>
+                                    <th className="p-2 border">No. Ref</th>
+                                    <th className="p-2 border">Keterangan</th>
+                                    <th className="p-2 border text-center w-20">Masuk</th>
+                                    <th className="p-2 border text-center w-20">Keluar</th>
+                                    <th className="p-2 border text-center w-20">Sisa Stok</th>
+                                    <th className="p-2 border">Petugas</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y">
+                                {filteredMutations.map((mut, i) => (
+                                    <tr key={i} className="border-b hover:bg-slate-50">
+                                        <td className="p-2 border font-mono">{mut.date}</td>
+                                        <td className="p-2 border font-mono font-bold text-indigo-700">{mut.refNo}</td>
+                                        <td className="p-2 border">{mut.ket}</td>
+                                        <td className="p-2 border text-center font-bold text-emerald-600">{mut.inQty > 0 ? `+${mut.inQty}` : '-'}</td>
+                                        <td className="p-2 border text-center font-bold text-rose-600">{mut.outQty > 0 ? `-${mut.outQty}` : '-'}</td>
+                                        <td className="p-2 border text-center font-black bg-slate-50">{mut.balance}</td>
+                                        <td className="p-2 border text-slate-600">{mut.petugas || 'Admin'}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            );
+        }
+
+        // 6. DEFECTA VIEW
+        function DefectaView({ medicines }) {
+            const defectaList = medicines.filter(m => m.stock <= m.minStock);
+            return (
+                <div className="space-y-4">
+                    <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
+                        <h3 className="font-black text-slate-800 text-sm">Defecta & Re-Order Generator</h3>
+                    </div>
+                    <div className="bg-white rounded-2xl border overflow-hidden">
+                        <table className="w-full text-left text-xs">
+                            <thead className="bg-slate-50 border-b font-bold uppercase">
+                                <tr>
+                                    <th className="p-3">Obat</th>
+                                    <th className="p-3">Sisa Stok</th>
+                                    <th className="p-3">Buffer Min</th>
+                                    <th className="p-3 text-rose-600 font-black">Rekomendasi Re-order</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y">
+                                {defectaList.map(o => (
+                                    <tr key={o.id}>
+                                        <td className="p-3 font-bold">{o.name}</td>
+                                        <td className="p-3 font-black text-rose-600">{o.stock} {o.unit}</td>
+                                        <td className="p-3">{o.minStock} {o.unit}</td>
+                                        <td className="p-3 font-black text-indigo-700">+{(o.minStock * 2) - o.stock} {o.unit}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            );
+        }
+		
+        // --- SUBMENU MODUL SETUP ---
+        function SetupPegawaiView({ employees, setEmployees, addAuditLog }) {
+            const [form, setForm] = useState({ name: '', role: 'Apoteker', phone: '', status: 'Aktif' });
+            const [editId, setEditId] = useState(null);
+
+            const handleSubmit = async (e) => {
+                e.preventDefault();
+                if (!form.name || !form.phone) return;
+
+                if (editId) {
+                    if (supabaseClient) await supabaseClient.from('pegawai').update(form).eq('id', editId);
+                    setEmployees(employees.map(emp => emp.id === editId ? { ...emp, ...form } : emp));
+                    setEditId(null);
+                } else {
+                    const newId = `EMP-00${employees.length + 1}`;
+                    const newEmp = { id: newId, ...form };
+                    if (supabaseClient) await supabaseClient.from('pegawai').insert([newEmp]);
+                    setEmployees([...employees, newEmp]);
+                }
+                setForm({ name: '', role: 'Apoteker', phone: '', status: 'Aktif' });
+            };
+
+            return (
+                <div className="space-y-6">
+                    <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
+                        <h3 className="font-black text-slate-800 text-sm mb-3">{editId ? 'Edit Data Pegawai' : 'Tambah Pegawai Baru'}</h3>
+                        <form onSubmit={handleSubmit} className="grid grid-cols-5 gap-3 items-end">
+                            <div>
+                                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Nama Lengkap</label>
+                                <input type="text" value={form.name} onChange={e=>setForm({...form, name: e.target.value})} required className="w-full p-2 border rounded-xl font-bold text-xs bg-white" />
+                            </div>
+                            <div>
+                                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Jabatan / Role</label>
+                                <select value={form.role} onChange={e=>setForm({...form, role: e.target.value})} className="w-full p-2 border rounded-xl font-bold text-xs bg-white">
+                                    <option value="Super Admin / APJ">Super Admin / APJ</option>
+                                    <option value="Apoteker">Apoteker</option>
+                                    <option value="Kasir POS">Kasir POS</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">No. Telepon</label>
+                                <input type="text" value={form.phone} onChange={e=>setForm({...form, phone: e.target.value})} required className="w-full p-2 border rounded-xl font-bold text-xs bg-white" />
+                            </div>
+                            <div>
+                                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Status</label>
+                                <select value={form.status} onChange={e=>setForm({...form, status: e.target.value})} className="w-full p-2 border rounded-xl font-bold text-xs bg-white">
+                                    <option value="Aktif">Aktif</option>
+                                    <option value="Non-Aktif">Non-Aktif</option>
+                                </select>
+                            </div>
+                            <div className="flex gap-2">
+                                <button type="submit" className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-xl text-xs shadow-md">Simpan</button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+                        <table className="w-full text-left text-xs">
+                            <thead className="bg-slate-50 border-b text-slate-600 font-bold uppercase">
+                                <tr>
+                                    <th className="p-3">ID Pegawai</th>
+                                    <th className="p-3">Nama Lengkap</th>
+                                    <th className="p-3">Role</th>
+                                    <th className="p-3">Telepon</th>
+                                    <th className="p-3">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y">
+                                {employees.map(emp => (
+                                    <tr key={emp.id} className="hover:bg-slate-50">
+                                        <td className="p-3 font-mono font-bold text-indigo-700">{emp.id}</td>
+                                        <td className="p-3 font-bold text-slate-800">{emp.name}</td>
+                                        <td className="p-3">{emp.role}</td>
+                                        <td className="p-3 font-mono">{emp.phone}</td>
+                                        <td className="p-3"><span className="px-2 py-0.5 rounded-full font-bold text-[10px] bg-emerald-100 text-emerald-800">{emp.status}</span></td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            );
+        }
+
+        function SetupRoleView({ rolesList }) {
+            return (
+                <div className="bg-white p-5 rounded-2xl border shadow-xs space-y-4 text-xs">
+                    <h3 className="font-black text-slate-800 text-sm">Hak Akses Modul</h3>
+                    <div className="grid grid-cols-2 gap-4">
+                        {rolesList.map(r => (
+                            <div key={r.id} className="p-4 border rounded-2xl bg-slate-50 space-y-2">
+                                <h4 className="font-extrabold text-indigo-900 text-sm">{r.name}</h4>
+                                <p className="text-slate-500">{r.desc}</p>
+                                <div className="flex flex-wrap gap-1 pt-2">
+                                    {r.access.map(a => (<span key={a} className="px-2 py-1 bg-white border text-indigo-700 font-bold rounded-lg text-[10px]">{a}</span>))}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+        }
+
+        function SetupKategoriPelangganView({ custCategories }) {
+            return (
+                <div className="bg-white rounded-2xl border shadow-xs overflow-hidden text-xs">
+                    <table className="w-full text-left">
+                        <thead className="bg-slate-50 border-b font-bold uppercase">
+                            <tr>
+                                <th className="p-3">ID</th>
+                                <th className="p-3">Kategori Pelanggan</th>
+                                <th className="p-3">Diskon</th>
+                                <th className="p-3">Deskripsi</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y">
+                            {custCategories.map(c => (
+                                <tr key={c.id}>
+                                    <td className="p-3 font-mono font-bold text-indigo-700">{c.id}</td>
+                                    <td className="p-3 font-bold">{c.name}</td>
+                                    <td className="p-3 font-mono font-bold text-emerald-600">{c.discount}</td>
+                                    <td className="p-3 text-slate-600">{c.desc}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            );
+        }
+
+        function SetupKategoriProdukView({ prodCategories }) {
+            return (
+                <div className="bg-white rounded-2xl border shadow-xs overflow-hidden text-xs">
+                    <table className="w-full text-left">
+                        <thead className="bg-slate-50 border-b font-bold uppercase">
+                            <tr>
+                                <th className="p-3">ID</th>
+                                <th className="p-3">Kategori Produk</th>
+                                <th className="p-3">Keterangan</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y">
+                            {prodCategories.map(p => (
+                                <tr key={p.id}>
+                                    <td className="p-3 font-mono font-bold text-indigo-700">{p.id}</td>
+                                    <td className="p-3 font-bold">{p.name}</td>
+                                    <td className="p-3 text-slate-600">{p.desc}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            );
+        }
+
+        function SetupSatuanView({ unitsList }) {
+            return (
+                <div className="bg-white rounded-2xl border shadow-xs overflow-hidden text-xs">
+                    <table className="w-full text-left">
+                        <thead className="bg-slate-50 border-b font-bold uppercase">
+                            <tr>
+                                <th className="p-3">ID</th>
+                                <th className="p-3">Satuan Besar</th>
+                                <th className="p-3">Satuan Kecil</th>
+                                <th className="p-3 text-center">Konversi</th>
+                                <th className="p-3">Keterangan Aturan</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y">
+                            {unitsList.map(u => (
+                                <tr key={u.id}>
+                                    <td className="p-3 font-mono font-bold text-indigo-700">{u.id}</td>
+                                    <td className="p-3 font-bold">{u.largeUnit}</td>
+                                    <td className="p-3 font-bold">{u.smallUnit}</td>
+                                    <td className="p-3 text-center font-black text-emerald-600">{u.conversion}</td>
+                                    <td className="p-3 text-slate-600">{u.desc}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            );
+        }
+
+        function DoctorCommissionView({ doctors }) {
+            return (
+                <div className="bg-white rounded-2xl border overflow-hidden text-xs">
+                    <table className="w-full text-left">
+                        <thead className="bg-slate-50 border-b font-bold uppercase">
+                            <tr>
+                                <th className="p-3">Nama Dokter</th>
+                                <th className="p-3">SIP</th>
+                                <th className="p-3">Skema Komisi</th>
+                                <th className="p-3 text-right">Akumulasi Komisi</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y">
+                            {doctors.map(d => (
+                                <tr key={d.id}>
+                                    <td className="p-3 font-bold">{d.name}</td>
+                                    <td className="p-3 font-mono">{d.sip}</td>
+                                    <td className="p-3">{d.commissionValue}% dari Jasa Resep</td>
+                                    <td className="p-3 text-right font-mono font-black text-emerald-600">Rp {d.earnedCommission.toLocaleString()}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            );
+        }
+
+        function AuditTrailView({ auditLogs }) {
+            return (
+                <div className="bg-white rounded-2xl border overflow-hidden text-xs">
+                    <table className="w-full text-left">
+                        <thead className="bg-slate-50 border-b font-bold uppercase">
+                            <tr>
+                                <th className="p-3">Waktu</th>
+                                <th className="p-3">Role</th>
+                                <th className="p-3">Modul</th>
+                                <th className="p-3">Aktivitas Log</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y">
+                            {auditLogs.map((log, idx) => (
+                                <tr key={idx}>
+                                    <td className="p-3 font-mono text-[10px]">{log.time}</td>
+                                    <td className="p-3 font-bold text-indigo-700">{log.role}</td>
+                                    <td className="p-3 font-semibold">{log.module}</td>
+                                    <td className="p-3">{log.detail}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
